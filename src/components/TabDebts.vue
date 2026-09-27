@@ -24,6 +24,7 @@
             <div class="item-meta">
               {{ d.type }} · 每月 {{ fmt(d.monthlyPayment) }} · {{ d.dueDay }} 日
             </div>
+            <div class="item-meta">首期 {{ firstDueLabel(d) }}</div>
           </div>
         </div>
         <div style="text-align: right; flex: none">
@@ -75,6 +76,10 @@
         <input v-model="form.dueDay" type="number" inputmode="numeric" placeholder="5">
       </div>
       <div class="field">
+        <label>首期延后月数（0 = 计划起始月当月开始）</label>
+        <input v-model="form.startOffset" type="number" inputmode="numeric" placeholder="0">
+      </div>
+      <div class="field">
         <label>备注（可选）</label>
         <input v-model="form.note" type="text">
       </div>
@@ -104,10 +109,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive } from 'vue'
 import BaseModal from './BaseModal.vue'
 import { state, sortedDebts, saveDebt, deleteDebt, prepayDebt } from '../store'
-import { formatMoney, getDebtTypeIcon, DEBT_TYPES } from '../lib/data'
+import { formatMoney, getDebtTypeIcon, debtFirstDueMonth, DEBT_TYPES } from '../lib/data'
 import { showToast } from '../lib/toast'
 
 const fmt = formatMoney
@@ -118,12 +123,19 @@ function paidPercent(d) {
   return Math.round(((d.originalPrincipal - d.principal) / d.originalPrincipal) * 100)
 }
 
+// 首期年月展示：如「2026/11 · 5 日」
+function firstDueLabel(d) {
+  const m = debtFirstDueMonth(d, state.settings.startDate)
+  if (!m) return '—'
+  return `${m.year}/${String(m.month).padStart(2, '0')} · ${d.dueDay} 日`
+}
+
 // ===== 编辑债务 =====
 const debtOpen = ref(false)
 const editingId = ref(null)
 const form = reactive({
   name: '', type: '信用卡', principal: '', monthlyPayment: '',
-  remainingPeriods: '', dueDay: 5, note: ''
+  remainingPeriods: '', dueDay: 5, startOffset: 0, note: ''
 })
 
 function openDebt(debt = null) {
@@ -135,6 +147,7 @@ function openDebt(debt = null) {
     monthlyPayment: debt ? String(debt.monthlyPayment) : '',
     remainingPeriods: debt ? String(debt.remainingPeriods) : '',
     dueDay: debt ? String(debt.dueDay) : '5',
+    startOffset: debt ? String(debt.startOffset || 0) : '0',
     note: debt ? debt.note : ''
   })
   debtOpen.value = true
@@ -153,6 +166,7 @@ function saveDebtItem() {
     monthlyPayment: parseFloat(form.monthlyPayment) || 0,
     remainingPeriods: parseInt(form.remainingPeriods, 10) || 0,
     dueDay: parseInt(form.dueDay, 10) || 5,
+    startOffset: Math.max(0, parseInt(form.startOffset, 10) || 0),
     note: form.note.trim()
   })
   debtOpen.value = false

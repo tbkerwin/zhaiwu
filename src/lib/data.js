@@ -5,62 +5,65 @@
 export const STORAGE_KEY = 'zhaiwu_data_v1'
 
 // 默认初始数据（基于个人负债消除计划书 - 修订版）
+// startOffset：首期相对计划起始月（2026-10）延后的月数
+//   0 = 起始月当月开始还；1 = 从次月（2026-11）开始还
+//   信用卡账单日 15 日、还款日次月 5 日，故信用卡分期首期在 11 月 5 日
 export const DEFAULT_DEBTS = [
   {
     id: 'd1', name: '车贷', type: '车贷',
     principal: 73418.23, monthlyPayment: 2368.33,
-    remainingPeriods: 31, dueDay: 15,
-    note: '分期 31 期，2026/10 - 2029/04',
+    remainingPeriods: 31, dueDay: 15, startOffset: 0,
+    note: '分期 31 期，2026/10 - 2029/04，每月 15 日扣款',
     originalPrincipal: 73418.23, paidHistory: []
   },
   {
     id: 'd2', name: '信用卡 5', type: '信用卡',
     principal: 3685.11, monthlyPayment: 3685.11,
-    remainingPeriods: 1, dueDay: 5,
-    note: '10/5 一次性还款，9 月账单，无分期',
+    remainingPeriods: 1, dueDay: 5, startOffset: 0,
+    note: '9 月账单，10/5 一次性还清，无分期',
     originalPrincipal: 3685.11, paidHistory: []
   },
   {
     id: 'd3', name: '信用卡 6', type: '信用卡',
     principal: 5301.18, monthlyPayment: 443.85,
-    firstMonthPayment: 418.83, // 首月金额与后续不同
-    remainingPeriods: 12, dueDay: 5,
-    note: '首月 418.83，后续每月 443.85',
+    firstMonthPayment: 418.83, // 首期金额与后续不同
+    remainingPeriods: 12, dueDay: 5, startOffset: 1,
+    note: '分期 12 期，2026/11 - 2027/10，首期 418.83',
     originalPrincipal: 5301.18, paidHistory: []
   },
   {
     id: 'd4', name: '信用卡 4', type: '信用卡',
     principal: 3586.96, monthlyPayment: 448.37,
-    remainingPeriods: 8, dueDay: 5,
-    note: '分期 8 期',
+    remainingPeriods: 8, dueDay: 5, startOffset: 1,
+    note: '分期 8 期，2026/11 - 2027/06',
     originalPrincipal: 3586.96, paidHistory: []
   },
   {
     id: 'd5', name: '信用卡 3', type: '信用卡',
     principal: 2071.57, monthlyPayment: 109.03,
-    remainingPeriods: 19, dueDay: 5,
-    note: '分期 19 期',
+    remainingPeriods: 19, dueDay: 5, startOffset: 1,
+    note: '分期 19 期，2026/11 - 2028/05',
     originalPrincipal: 2071.57, paidHistory: []
   },
   {
     id: 'd6', name: '信用卡 2', type: '信用卡',
     principal: 1491.84, monthlyPayment: 93.24,
-    remainingPeriods: 16, dueDay: 5,
-    note: '分期 16 期',
+    remainingPeriods: 16, dueDay: 5, startOffset: 1,
+    note: '分期 16 期，2026/11 - 2028/02',
     originalPrincipal: 1491.84, paidHistory: []
   },
   {
     id: 'd7', name: '花呗', type: '花呗',
     principal: 548.87, monthlyPayment: 78.41,
-    remainingPeriods: 7, dueDay: 15,
-    note: '分期 7 期，每月 15 日还款',
+    remainingPeriods: 7, dueDay: 15, startOffset: 0,
+    note: '分期 7 期，2026/10 - 2027/04，每月 15 日还款',
     originalPrincipal: 548.87, paidHistory: []
   },
   {
     id: 'd8', name: '信用卡 1', type: '信用卡',
     principal: 481.32, monthlyPayment: 68.76,
-    remainingPeriods: 7, dueDay: 5,
-    note: '分期 7 期',
+    remainingPeriods: 7, dueDay: 5, startOffset: 1,
+    note: '分期 7 期，2026/11 - 2027/05',
     originalPrincipal: 481.32, paidHistory: []
   }
 ]
@@ -86,23 +89,23 @@ export const DEFAULT_SETTINGS = {
 export const STAGES = [
   {
     id: 1, name: '阶段 1：启动期', period: '2026 年 10 月',
-    desc: '仅覆盖刚性还款，动用约 4170 元备用金，保留应急储备',
+    desc: '10/5 只还信用卡 5（9 月账单），加车贷与花呗，动用备用金约 2711 元',
     endDate: '2026-10-31'
   },
   {
-    id: 2, name: '阶段 2：过渡期', period: '2026/11 - 2027/09',
-    desc: '靠备用金补缺口，月供 3014-3609 元',
-    endDate: '2027-09-30'
+    id: 2, name: '阶段 2：过渡期', period: '2026/11 - 2027/06',
+    desc: '信用卡分期从 11 月起计入，靠备用金补缺口，月供 3463-3610 元',
+    endDate: '2027-06-30'
   },
   {
-    id: 3, name: '阶段 3：正向积累期', period: '2027/10 - 2028/04',
-    desc: '开始月度盈余 529-622 元，逐步补回备用金',
-    endDate: '2028-04-30'
+    id: 3, name: '阶段 3：正向积累期', period: '2027/07 - 2028/05',
+    desc: '月度盈余 407-944 元并逐步增长，2028 年 1 月备用金回到 1 万元以上',
+    endDate: '2028-05-31'
   },
   {
-    id: 4, name: '阶段 4：车贷冲刺期', period: '2028/05 - 2029/02',
-    desc: '集中提前结清车贷，预计提前 2 个月结清',
-    endDate: '2029-02-28'
+    id: 4, name: '阶段 4：车贷冲刺期', period: '2028/06 - 2029/04',
+    desc: '仅剩车贷，月净结余 1052.67 元，可用于提前结清',
+    endDate: '2029-04-30'
   }
 ]
 
@@ -157,7 +160,7 @@ export function getDefaultData() {
     settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
     transactions: [],
     assets: [],
-    version: 6
+    version: 7
   }
 }
 
@@ -209,6 +212,7 @@ export function normalizeData(data) {
         : (typeof d.principal === 'number' ? d.principal : 0),
       monthlyPayment: typeof d.monthlyPayment === 'number' ? d.monthlyPayment : 0,
       firstMonthPayment: typeof d.firstMonthPayment === 'number' ? d.firstMonthPayment : null,
+      startOffset: typeof d.startOffset === 'number' ? d.startOffset : 0,
       remainingPeriods: typeof d.remainingPeriods === 'number' ? d.remainingPeriods : 0,
       dueDay: typeof d.dueDay === 'number' ? d.dueDay : 5,
       note: typeof d.note === 'string' ? d.note : '',
@@ -247,7 +251,17 @@ export function normalizeData(data) {
     })
   }
 
-  data.version = 6
+  // 一次性修正：信用卡分期首期后移一个月（账单日 15 日 → 次月 5 日还款）
+  // 10/5 只有信用卡 5（9 月账单），信用卡 1/2/3/4/6 从 11/5 开始还
+  if (!data.version || data.version < 7) {
+    data.debts.forEach(d => {
+      if (d.type === '信用卡' && d.name !== '信用卡 5' && !d.startOffset) {
+        d.startOffset = 1
+      }
+    })
+  }
+
+  data.version = 7
   return data
 }
 
@@ -292,7 +306,7 @@ export function monthsElapsedSince(settings, now = new Date()) {
     (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()))
 }
 
-// 当月应还月供（按剩余期数递减推算，首月按 firstMonthPayment 计）
+// 当月应还月供（考虑各笔首期延后月数）
 export function currentMonthPayment(data, now = new Date()) {
   const start = new Date(data.settings.startDate)
   if (isNaN(start.getTime())) return 0
@@ -300,10 +314,7 @@ export function currentMonthPayment(data, now = new Date()) {
   const elapsed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth())
   if (elapsed < 0) return 0 // 计划尚未开始
 
-  return (data.debts || []).reduce((sum, d) => {
-    if (d.remainingPeriods <= elapsed) return sum
-    return sum + paymentOfMonth(d, elapsed)
-  }, 0)
+  return (data.debts || []).reduce((sum, d) => sum + debtPaymentAt(d, elapsed), 0)
 }
 
 // 某笔债务在指定月序（0 = 起始月）的应还金额
@@ -311,6 +322,22 @@ export function paymentOfMonth(debt, monthIndex) {
   return monthIndex === 0 && debt.firstMonthPayment
     ? debt.firstMonthPayment
     : debt.monthlyPayment
+}
+
+// 债务在月序 elapsed 的应还金额：考虑 startOffset（首期延后月数）
+// 未到首期或已还完则返回 0
+export function debtPaymentAt(debt, elapsed) {
+  const idx = elapsed - (debt.startOffset || 0)
+  if (idx < 0 || idx >= (debt.remainingPeriods || 0)) return 0
+  return paymentOfMonth(debt, idx)
+}
+
+// 债务首期的年月（用于展示）
+export function debtFirstDueMonth(debt, startDateStr) {
+  const start = new Date(startDateStr)
+  if (isNaN(start.getTime())) return null
+  const d = new Date(start.getFullYear(), start.getMonth() + (debt.startOffset || 0), 1)
+  return { year: d.getFullYear(), month: d.getMonth() + 1 }
 }
 
 export function getCurrentStage(now = new Date()) {
@@ -326,36 +353,35 @@ export function buildMonthlyPlan(data, maxMonths = 60) {
   if (isNaN(start.getTime())) return []
 
   const disposable = monthlyDisposable(data.settings)
-  const states = (data.debts || []).map(d => ({
-    name: d.name,
-    monthlyPayment: d.monthlyPayment,
-    firstMonthPayment: d.firstMonthPayment,
-    dueDay: d.dueDay,
-    monthsLeft: d.remainingPeriods
-  }))
+  const debts = data.debts || []
 
   const now = new Date()
   const plan = []
   const cursor = new Date(start)
 
-  while (states.some(s => s.monthsLeft > 0) && plan.length < maxMonths) {
-    const monthIndex = plan.length
-    const active = states.filter(s => s.monthsLeft > 0)
-    const totalPayment = active.reduce((sum, s) => sum + paymentOfMonth(s, monthIndex), 0)
+  // 债务是否还有未到期的期数
+  const hasFuture = elapsed =>
+    debts.some(d => elapsed < (d.startOffset || 0) + (d.remainingPeriods || 0))
+
+  while (hasFuture(plan.length) && plan.length < maxMonths) {
+    const elapsed = plan.length
+    const active = debts.filter(d => debtPaymentAt(d, elapsed) > 0)
+    const totalPayment = active.reduce((sum, d) => sum + debtPaymentAt(d, elapsed), 0)
+
     plan.push({
       year: cursor.getFullYear(),
       month: cursor.getMonth() + 1,
       totalPayment,
       disposable,
       remaining: disposable - totalPayment,
-      debts: active.map(s => ({
-        name: s.name,
-        amount: paymentOfMonth(s, monthIndex),
-        dueDay: s.dueDay
+      debts: active.map(d => ({
+        name: d.name,
+        amount: debtPaymentAt(d, elapsed),
+        dueDay: d.dueDay
       })),
       isCurrent: cursor.getFullYear() === now.getFullYear() && cursor.getMonth() === now.getMonth()
     })
-    states.forEach(s => { if (s.monthsLeft > 0) s.monthsLeft -= 1 })
+
     cursor.setMonth(cursor.getMonth() + 1)
   }
 
@@ -370,7 +396,7 @@ export function plannedIncomeOfMonth(settings, year, month) {
   return (settings.monthlyIncome || 0) + (settings.didiIncome || 0)
 }
 
-// 某月刚性还款额：按该月距起始日的月数推算（起始月按 firstMonthPayment 计）
+// 某月刚性还款额（考虑各笔首期延后月数）
 // 早于计划起始月的月份不计还款
 export function repaymentOfMonth(data, year, month) {
   const start = new Date(data.settings.startDate)
@@ -379,10 +405,7 @@ export function repaymentOfMonth(data, year, month) {
   const elapsed = (year - start.getFullYear()) * 12 + (month - 1 - start.getMonth())
   if (elapsed < 0) return 0
 
-  return (data.debts || []).reduce((sum, d) => {
-    if (d.remainingPeriods <= elapsed) return sum
-    return sum + paymentOfMonth(d, elapsed)
-  }, 0)
+  return (data.debts || []).reduce((sum, d) => sum + debtPaymentAt(d, elapsed), 0)
 }
 
 // 某月计划状态：计划收入 / 计划还款 / 固定扣费 / 本月差额
@@ -442,20 +465,17 @@ export function buildMonthTimelines(data, maxMonths = 60) {
   const start = new Date(settings.startDate)
   if (isNaN(start.getTime())) return []
 
-  const states = (data.debts || []).map(d => ({
-    name: d.name,
-    dueDay: d.dueDay || 5,
-    monthlyPayment: d.monthlyPayment,
-    firstMonthPayment: d.firstMonthPayment,
-    monthsLeft: d.remainingPeriods
-  }))
-
   const now = new Date()
   const timelines = []
   const cursor = new Date(start)
+  const debts = data.debts || []
   let carry = settings.initialSavings || 0
 
-  while (states.some(s => s.monthsLeft > 0) && timelines.length < maxMonths) {
+  // 债务是否还有未到期的期数
+  const hasFuture = elapsed =>
+    debts.some(d => elapsed < (d.startOffset || 0) + (d.remainingPeriods || 0))
+
+  while (hasFuture(timelines.length) && timelines.length < maxMonths) {
     const elapsed = timelines.length
     const year = cursor.getFullYear()
     const month = cursor.getMonth() + 1
@@ -465,11 +485,12 @@ export function buildMonthTimelines(data, maxMonths = 60) {
 
     // 还款事件：按还款日分组
     const byDay = new Map()
-    states.forEach(s => {
-      if (s.monthsLeft <= 0) return
-      const day = s.dueDay
+    debts.forEach(d => {
+      const amount = debtPaymentAt(d, elapsed)
+      if (amount <= 0) return
+      const day = d.dueDay || 5
       if (!byDay.has(day)) byDay.set(day, [])
-      byDay.get(day).push({ name: s.name, amount: paymentOfMonth(s, elapsed) })
+      byDay.get(day).push({ name: d.name, amount })
     })
 
     const rawEvents = [
@@ -527,7 +548,6 @@ export function buildMonthTimelines(data, maxMonths = 60) {
     })
 
     carry = carry + totalIncome - totalPayment
-    states.forEach(s => { if (s.monthsLeft > 0) s.monthsLeft -= 1 })
     cursor.setMonth(cursor.getMonth() + 1)
   }
 
