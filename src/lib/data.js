@@ -23,6 +23,7 @@ export const DEFAULT_DEBTS = [
   {
     id: 'd3', name: '信用卡 6', type: '信用卡',
     principal: 5301.18, monthlyPayment: 443.85,
+    firstMonthPayment: 418.83, // 首月金额与后续不同
     remainingPeriods: 12, dueDay: 5,
     note: '首月 418.83，后续每月 443.85',
     originalPrincipal: 5301.18, paidHistory: []
@@ -69,9 +70,14 @@ export const DEFAULT_SETTINGS = {
   monthlyExpense: 1300,
   didiIncome: 400,          // 滴滴月目标收入（每周 1 天 × 100 元）
   initialSavings: 10000,
-  emergencyReserve: 2500,   // 应急储备底线（原则上不动用）
+  emergencyReserve: 4800,   // 应急储备底线（备用金最低点 4975，红线 4800）
   startDate: '2026-10-01',
   strategy: 'conservative',
+  // 每月固定会员扣费（自动扣款，计入硬性支出）
+  fixedFees: [
+    { id: 'fee1', name: '会员扣费 1', amount: 68 },
+    { id: 'fee2', name: '会员扣费 2', amount: 11 }
+  ],
   monthlyIncomeOverrides: {
     '2026-09': 400          // 9 月仅 28 号一笔 400 元
   }
@@ -218,6 +224,18 @@ export function normalizeData(data) {
   if (!s.monthlyIncomeOverrides || typeof s.monthlyIncomeOverrides !== 'object') {
     s.monthlyIncomeOverrides = { ...def.monthlyIncomeOverrides }
   }
+  // 兼容 v2 及更早数据：补齐固定扣费字段（已存在则保留，包括空数组）
+  if (!Array.isArray(s.fixedFees)) {
+    s.fixedFees = JSON.parse(JSON.stringify(def.fixedFees))
+  } else {
+    s.fixedFees = s.fixedFees
+      .filter(f => f && typeof f === 'object')
+      .map(f => ({
+        id: f.id || generateId('f'),
+        name: f.name || '扣费项',
+        amount: typeof f.amount === 'number' ? f.amount : 0
+      }))
+  }
 
   data.debts = data.debts
     .filter(d => d && typeof d === 'object')
@@ -230,6 +248,7 @@ export function normalizeData(data) {
         ? d.originalPrincipal
         : (typeof d.principal === 'number' ? d.principal : 0),
       monthlyPayment: typeof d.monthlyPayment === 'number' ? d.monthlyPayment : 0,
+      firstMonthPayment: typeof d.firstMonthPayment === 'number' ? d.firstMonthPayment : null,
       remainingPeriods: typeof d.remainingPeriods === 'number' ? d.remainingPeriods : 0,
       dueDay: typeof d.dueDay === 'number' ? d.dueDay : 5,
       note: typeof d.note === 'string' ? d.note : '',
@@ -289,11 +308,17 @@ export function netWorth(data) {
   return totalAssets(data) - totalDebt(data)
 }
 
-// 月可支配 = 工资 + 滴滴收入 - 生活费
+// 每月固定扣费合计（会员等自动扣款，计入硬性支出）
+export function totalFixedFees(settings) {
+  return (settings.fixedFees || []).reduce((sum, f) => sum + (f.amount || 0), 0)
+}
+
+// 月可支配 = 工资 + 滴滴收入 − 生活费 − 固定扣费
 export function monthlyDisposable(settings) {
   return (settings.monthlyIncome || 0)
     + (settings.didiIncome || 0)
     - (settings.monthlyExpense || 0)
+    - totalFixedFees(settings)
 }
 
 // 距 startDate 已过去的月数
@@ -304,12 +329,25 @@ export function monthsElapsedSince(settings, now = new Date()) {
     (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()))
 }
 
-// 当月应还月供（按剩余期数递减推算）
+// 当月应还月供（按剩余期数递减推算，首月按 firstMonthPayment 计）
 export function currentMonthPayment(data, now = new Date()) {
-  const elapsed = monthsElapsedSince(data.settings, now)
+  const start = new Date(data.settings.startDate)
+  if (isNaN(start.getTime())) return 0
+
+  const elapsed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth())
+  if (elapsed < 0) return 0 // 计划尚未开始
+
   return (data.debts || []).reduce((sum, d) => {
-    return d.remainingPeriods > elapsed ? sum + d.monthlyPayment : sum
+    if (d.remainingPeriods <= elapsed) return sum
+    return sum + paymentOfMonth(d, elapsed)
   }, 0)
+}
+
+// 某笔债务在指定月序（0 = 起始月）的应还金额
+export function paymentOfMonth(debt, monthIndex) {
+  return monthIndex === 0 && debt.firstMonthPayment
+    ? debt.firstMonthPayment
+    : debt.monthlyPayment
 }
 
 export function getCurrentStage(now = new Date()) {
@@ -328,6 +366,7 @@ export function buildMonthlyPlan(data, maxMonths = 60) {
   const states = (data.debts || []).map(d => ({
     name: d.name,
     monthlyPayment: d.monthlyPayment,
+    firstMonthPayment: d.firstMonthPayment,
     dueDay: d.dueDay,
     monthsLeft: d.remainingPeriods
   }))
@@ -337,15 +376,20 @@ export function buildMonthlyPlan(data, maxMonths = 60) {
   const cursor = new Date(start)
 
   while (states.some(s => s.monthsLeft > 0) && plan.length < maxMonths) {
+    const monthIndex = plan.length
     const active = states.filter(s => s.monthsLeft > 0)
-    const totalPayment = active.reduce((sum, s) => sum + s.monthlyPayment, 0)
+    const totalPayment = active.reduce((sum, s) => sum + paymentOfMonth(s, monthIndex), 0)
     plan.push({
       year: cursor.getFullYear(),
       month: cursor.getMonth() + 1,
       totalPayment,
       disposable,
       remaining: disposable - totalPayment,
-      debts: active.map(s => ({ name: s.name, amount: s.monthlyPayment, dueDay: s.dueDay })),
+      debts: active.map(s => ({
+        name: s.name,
+        amount: paymentOfMonth(s, monthIndex),
+        dueDay: s.dueDay
+      })),
       isCurrent: cursor.getFullYear() === now.getFullYear() && cursor.getMonth() === now.getMonth()
     })
     states.forEach(s => { if (s.monthsLeft > 0) s.monthsLeft -= 1 })
@@ -374,24 +418,29 @@ export function monthlyBudget(data, year, month) {
     .reduce((sum, t) => sum + t.amount, 0)
 
   const expenseBudget = data.settings.monthlyExpense || 0
+  const fixedFees = totalFixedFees(data.settings)
   const plannedIncome = plannedIncomeOfMonth(data.settings, year, month)
 
-  // 当月应还：按该月距起始日的月数推算
-  const elapsed = Math.max(0,
-    (year - new Date(data.settings.startDate).getFullYear()) * 12 +
-    (month - 1 - new Date(data.settings.startDate).getMonth()))
-  const plannedPayment = (data.debts || []).reduce((sum, d) => {
-    return d.remainingPeriods > elapsed ? sum + d.monthlyPayment : sum
-  }, 0)
+  // 当月应还：按该月距起始日的月数推算（起始月按 firstMonthPayment 计）
+  // 早于计划起始月的月份不计还款
+  const start = new Date(data.settings.startDate)
+  const elapsed = (year - start.getFullYear()) * 12 + (month - 1 - start.getMonth())
+  const plannedPayment = elapsed < 0
+    ? 0
+    : (data.debts || []).reduce((sum, d) => {
+      if (d.remainingPeriods <= elapsed) return sum
+      return sum + paymentOfMonth(d, elapsed)
+    }, 0)
 
   return {
     list,
     spent,
     earned,
     expenseBudget,
+    fixedFees,
     expenseLeft: expenseBudget - spent,
     plannedIncome,
     plannedPayment,
-    freeToSpend: plannedIncome - plannedPayment - spent
+    freeToSpend: plannedIncome - plannedPayment - spent - fixedFees
   }
 }

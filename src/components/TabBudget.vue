@@ -39,6 +39,10 @@
         <span class="row-value">−{{ fmt(budget.plannedPayment) }}</span>
       </div>
       <div class="card-row">
+        <span class="row-label">固定扣费（会员）</span>
+        <span class="row-value">−{{ fmt(budget.fixedFees) }}</span>
+      </div>
+      <div class="card-row">
         <span class="row-label">已记录收入</span>
         <span class="row-value muted">+{{ fmt(budget.earned) }}</span>
       </div>

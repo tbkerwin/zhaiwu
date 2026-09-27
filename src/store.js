@@ -15,6 +15,7 @@ import {
   totalAssets,
   netWorth,
   monthlyDisposable,
+  totalFixedFees,
   currentMonthPayment,
   getCurrentStage,
   buildMonthlyPlan
@@ -57,6 +58,7 @@ export const totals = computed(() => ({
     ? Math.round((totalPaid(state) / totalOriginal(state)) * 100)
     : 0,
   disposable: monthlyDisposable(state.settings),
+  fixedFees: totalFixedFees(state.settings),
   monthPayment: currentMonthPayment(state),
   stage: getCurrentStage()
 }))
@@ -141,6 +143,24 @@ export function saveAsset(asset) {
 
 export function deleteAsset(id) {
   state.assets = state.assets.filter(a => a.id !== id)
+}
+
+// ============================================
+// 固定扣费（会员等自动扣款）
+// ============================================
+
+export function saveFixedFee(fee) {
+  const list = state.settings.fixedFees
+  const idx = list.findIndex(f => f.id === fee.id)
+  if (idx >= 0) {
+    list[idx] = { ...list[idx], ...fee }
+  } else {
+    list.push({ id: generateId('f'), name: '扣费项', amount: 0, ...fee })
+  }
+}
+
+export function deleteFixedFee(id) {
+  state.settings.fixedFees = state.settings.fixedFees.filter(f => f.id !== id)
 }
 
 // ============================================

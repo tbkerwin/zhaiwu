@@ -31,22 +31,42 @@
 
     <!-- 本月待还 -->
     <div class="card">
+      <div class="section-title">{{ monthLabel }}</div>
       <div class="card-row">
-        <span class="row-label">本月待还</span>
-        <span class="row-value">{{ fmt(totals.monthPayment) }}</span>
+        <span class="row-label">本月计划收入</span>
+        <span class="row-value green">+{{ fmt(budget.plannedIncome) }}</span>
       </div>
       <div class="card-row">
-        <span class="row-label">月可支配（工资 + 滴滴 − 生活费）</span>
-        <span class="row-value">{{ fmt(totals.disposable) }}</span>
+        <span class="row-label">本月待还</span>
+        <span class="row-value">{{ fmt(budget.plannedPayment) }}</span>
+      </div>
+      <div class="card-row">
+        <span class="row-label">固定扣费（会员）</span>
+        <span class="row-value">−{{ fmt(budget.fixedFees) }}</span>
       </div>
       <div class="card-row">
         <span class="row-label">本月差额</span>
-        <span class="row-value" :class="monthGap >= 0 ? 'green' : 'orange'">
-          {{ monthGap >= 0 ? '+' : '' }}{{ fmt(monthGap) }}
+        <span class="row-value" :class="budget.freeToSpend >= 0 ? 'green' : 'orange'">
+          {{ budget.freeToSpend >= 0 ? '+' : '' }}{{ fmt(budget.freeToSpend) }}
         </span>
       </div>
       <div class="muted" style="margin-top: 8px">
-        {{ monthGap >= 0 ? '本月可结余，可用于提前还款' : '本月缺口由备用金补足' }}
+        {{ budget.freeToSpend >= 0 ? '本月可结余，可用于提前还款' : '本月缺口由备用金补足' }}
+      </div>
+    </div>
+
+    <!-- 常规月基准 -->
+    <div class="card">
+      <div class="section-title">常规月基准</div>
+      <div class="card-row">
+        <span class="row-label">月可支配（工资 + 滴滴 − 生活费 − 会员）</span>
+        <span class="row-value">{{ fmt(totals.disposable) }}</span>
+      </div>
+      <div class="card-row">
+        <span class="row-label">每月硬性支出（生活费 + 会员）</span>
+        <span class="row-value muted">
+          {{ fmt(state.settings.monthlyExpense + totals.fixedFees) }}
+        </span>
       </div>
     </div>
 
@@ -91,11 +111,14 @@
 <script setup>
 import { computed } from 'vue'
 import { state, totals } from '../store'
-import { formatMoney, getAssetCategoryMeta, STAGES } from '../lib/data'
+import { formatMoney, getAssetCategoryMeta, monthlyBudget, STAGES } from '../lib/data'
 
 defineEmits(['go'])
 
 const fmt = formatMoney
 const assetMeta = getAssetCategoryMeta
-const monthGap = computed(() => totals.value.disposable - totals.value.monthPayment)
+
+const now = new Date()
+const monthLabel = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月`
+const budget = computed(() => monthlyBudget(state, now.getFullYear(), now.getMonth() + 1))
 </script>
