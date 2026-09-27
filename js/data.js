@@ -4,7 +4,10 @@
 
 const STORAGE_KEY = 'zhaiwu_data_v1';
 
-// 默认初始数据（基于个人负债消除计划书）
+// 默认初始数据（基于个人负债消除计划书 - 修订版）
+// 修订原则：10000 元备用金尽量保留，仅启动月被动用；
+// 不再做原计划中"10 月批量提前结清 4 笔小额债务"的激进操作；
+// 月生活费节流至 1300 元以保证覆盖前 11 个月的刚性月供缺口。
 const DEFAULT_DEBTS = [
   {
     id: 'd1',
@@ -106,10 +109,11 @@ const DEFAULT_DEBTS = [
 
 const DEFAULT_SETTINGS = {
   monthlyIncome: 4400,
-  monthlyExpense: 1500,
+  monthlyExpense: 1300,
   initialSavings: 10000,
+  emergencyReserve: 2500, // 应急储备底线（原则上不动用）
   startDate: '2026-10-01',
-  strategy: 'avalanche' // 雪崩法：小额优先
+  strategy: 'conservative' // 修订版策略：能不用备用金就不用
 };
 
 const STAGES = [
@@ -117,22 +121,29 @@ const STAGES = [
     id: 1,
     name: '阶段 1：启动期',
     period: '2026 年 10 月',
-    desc: '首月还款 + 批量结清小额债务',
+    desc: '仅覆盖刚性还款，动用 4170 元备用金，保留应急储备',
     endDate: '2026-10-31'
   },
   {
     id: 2,
-    name: '阶段 2：优化期',
-    period: '2026/11 - 2027/02',
-    desc: '结清全部信用卡分期',
-    endDate: '2027-02-28'
+    name: '阶段 2：过渡期',
+    period: '2026/11 - 2027/09',
+    desc: '持续 11 个月靠备用金补缺口，月供 3014-3609 元',
+    endDate: '2027-09-30'
   },
   {
     id: 3,
-    name: '阶段 3：冲刺期',
-    period: '2027/03 - 2029/05',
-    desc: '集中提前结清车贷',
-    endDate: '2029-05-31'
+    name: '阶段 3：正向积累期',
+    period: '2027/10 - 2028/04',
+    desc: '开始月度盈余 529-622 元，恢复备用金至 6100 元',
+    endDate: '2028-04-30'
+  },
+  {
+    id: 4,
+    name: '阶段 4：车贷冲刺期',
+    period: '2028/05 - 2029/02',
+    desc: '集中提前结清车贷，月净结余 731 元，预计提前 2 个月结清',
+    endDate: '2029-02-28'
   }
 ];
 
@@ -147,18 +158,31 @@ function loadData() {
       const initial = {
         debts: DEFAULT_DEBTS,
         settings: DEFAULT_SETTINGS,
-        customStages: STAGES
+        customStages: STAGES,
+        version: 2
       };
       saveData(initial);
       return initial;
     }
-    return JSON.parse(raw);
+    const data = JSON.parse(raw);
+    // 数据迁移：旧版本升级到 v2，应用修订版默认值
+    if (!data.version || data.version < 2) {
+      data.settings.monthlyExpense = 1300;
+      data.settings.strategy = 'conservative';
+      if (typeof data.settings.emergencyReserve === 'undefined') {
+        data.settings.emergencyReserve = 2500;
+      }
+      data.version = 2;
+      saveData(data);
+    }
+    return data;
   } catch (e) {
     console.error('加载数据失败：', e);
     return {
       debts: DEFAULT_DEBTS,
       settings: DEFAULT_SETTINGS,
-      customStages: STAGES
+      customStages: STAGES,
+      version: 2
     };
   }
 }

@@ -140,6 +140,10 @@ function renderMonthSummary() {
   const totalMonthly = currentMonthPayment(appData);
   const disposable = getMonthlyDisposable(appData);
   const availableCash = getAvailableCash(appData);
+  const emergencyReserve = appData.settings.emergencyReserve || 0;
+  const availableForDebt = Math.max(0, availableCash - emergencyReserve);
+  const monthlyGap = totalMonthly - disposable;
+  const needFromSavings = monthlyGap > 0 ? monthlyGap : 0;
 
   if (monthly.length === 0) {
     container.innerHTML = `
@@ -165,9 +169,28 @@ function renderMonthSummary() {
       <span class="month-value">${formatMoney(disposable)}</span>
     </div>
     <div class="month-row">
-      <span class="month-label">备用金</span>
+      <span class="month-label">备用存款</span>
       <span class="month-value">${formatMoney(availableCash)}</span>
     </div>
+    <div class="month-row">
+      <span class="month-label" style="color:#8e8e93">↳ 应急储备（不动）</span>
+      <span class="month-value" style="color:#8e8e93">${formatMoney(emergencyReserve)}</span>
+    </div>
+    <div class="month-row">
+      <span class="month-label">可用于还款的备用金</span>
+      <span class="month-value">${formatMoney(availableForDebt)}</span>
+    </div>
+    ${needFromSavings > 0 ? `
+    <div class="month-row">
+      <span class="month-label" style="color:#ff9500">⚠️ 本月工资缺口</span>
+      <span class="month-value" style="color:#ff9500">${formatMoney(needFromSavings)}</span>
+    </div>
+    ` : `
+    <div class="month-row">
+      <span class="month-label" style="color:#34c759">✓ 本月盈余</span>
+      <span class="month-value" style="color:#34c759">${formatMoney(-monthlyGap)}</span>
+    </div>
+    `}
     <div class="month-row total">
       <span class="month-label">本月待还总额</span>
       <span class="month-value">${formatMoney(totalMonthly)}</span>
@@ -507,12 +530,14 @@ function renderSettings() {
   document.getElementById('monthlyIncome').value = appData.settings.monthlyIncome;
   document.getElementById('monthlyExpense').value = appData.settings.monthlyExpense;
   document.getElementById('savings').value = appData.settings.initialSavings;
+  document.getElementById('emergencyReserve').value = appData.settings.emergencyReserve || 2500;
 }
 
 function saveSettings() {
   appData.settings.monthlyIncome = parseFloat(document.getElementById('monthlyIncome').value) || 0;
   appData.settings.monthlyExpense = parseFloat(document.getElementById('monthlyExpense').value) || 0;
   appData.settings.initialSavings = parseFloat(document.getElementById('savings').value) || 0;
+  appData.settings.emergencyReserve = parseFloat(document.getElementById('emergencyReserve').value) || 0;
   saveData(appData);
   renderOverview();
   showToast('设置已保存');
