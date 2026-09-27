@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "updatedAt": "2026-09-27",
+  "currency": "CNY",
+  "assets": [
+    {
+      "id": "alipay",
+      "name": "支付宝余额",
+      "balance": 3942.17,
+      "category": "liquid",
+      "note": "日常支付、备用流动资金"
+    },
+    {
+      "id": "loan-out",
+      "name": "外借",
+      "balance": 5100,
+      "category": "receivable",
+      "note": "借出资金，待回收"
+    }
+  ]
+}
