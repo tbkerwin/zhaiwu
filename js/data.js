@@ -244,7 +244,8 @@ function loadData() {
         }
       });
     }
-    return data;
+    // 字段完整性修复：处理用户可能存在的字段缺失或类型错误
+    return normalizeData(data);
   } catch (e) {
     console.error('加载数据失败：', e);
     return {
@@ -256,6 +257,84 @@ function loadData() {
       version: 5
     };
   }
+}
+
+// 字段完整性规范化：保证所有字段类型正确，缺失字段用默认值补全
+// 即使 localStorage 中数据损坏也能恢复渲染
+function normalizeData(data) {
+  if (!data || typeof data !== 'object') {
+    return getDefaultData();
+  }
+
+  // 顶层字段类型保证
+  if (!Array.isArray(data.debts)) data.debts = [];
+  if (!Array.isArray(data.transactions)) data.transactions = [];
+  if (!Array.isArray(data.assets)) data.assets = [];
+  if (!Array.isArray(data.customStages)) data.customStages = [...STAGES];
+  if (!data.settings || typeof data.settings !== 'object') {
+    data.settings = { ...DEFAULT_SETTINGS };
+  }
+
+  // settings 字段补全（用 typeof 检查兼容旧版本未定义字段）
+  const s = data.settings;
+  const def = DEFAULT_SETTINGS;
+  if (typeof s.monthlyIncome !== 'number') s.monthlyIncome = def.monthlyIncome;
+  if (typeof s.monthlyExpense !== 'number') s.monthlyExpense = def.monthlyExpense;
+  if (typeof s.didiIncome !== 'number') s.didiIncome = def.didiIncome;
+  if (typeof s.initialSavings !== 'number') s.initialSavings = def.initialSavings;
+  if (typeof s.emergencyReserve !== 'number') s.emergencyReserve = def.emergencyReserve;
+  if (typeof s.startDate !== 'string') s.startDate = def.startDate;
+  if (typeof s.strategy !== 'string') s.strategy = def.strategy;
+  if (!s.monthlyIncomeOverrides || typeof s.monthlyIncomeOverrides !== 'object') {
+    s.monthlyIncomeOverrides = { ...def.monthlyIncomeOverrides };
+  }
+
+  // debts 每项校验
+  data.debts = data.debts.filter(d => d && typeof d === 'object').map(d => ({
+    id: d.id || ('d_' + Math.random().toString(36).slice(2, 9)),
+    type: d.type || '其他',
+    name: d.name || '未命名',
+    principal: typeof d.principal === 'number' ? d.principal : 0,
+    originalPrincipal: typeof d.originalPrincipal === 'number' ? d.originalPrincipal : (typeof d.principal === 'number' ? d.principal : 0),
+    monthlyPayment: typeof d.monthlyPayment === 'number' ? d.monthlyPayment : 0,
+    dueDay: typeof d.dueDay === 'number' ? d.dueDay : 5,
+    remainingPeriods: typeof d.remainingPeriods === 'number' ? d.remainingPeriods : 0,
+    paidHistory: Array.isArray(d.paidHistory) ? d.paidHistory : []
+  }));
+
+  // transactions 每项校验
+  data.transactions = data.transactions.filter(t => t && typeof t === 'object').map(t => ({
+    id: t.id || ('t_' + Math.random().toString(36).slice(2, 9)),
+    type: t.type === 'income' ? 'income' : 'expense',
+    amount: typeof t.amount === 'number' ? t.amount : 0,
+    category: t.category || 'other_expense',
+    note: typeof t.note === 'string' ? t.note : '',
+    date: typeof t.date === 'string' ? t.date : new Date().toISOString()
+  }));
+
+  // assets 每项校验
+  data.assets = data.assets.filter(a => a && typeof a === 'object').map(a => ({
+    id: a.id || ('a_' + Math.random().toString(36).slice(2, 9)),
+    type: a.type || a.category || 'other',
+    name: a.name || '未命名',
+    balance: typeof a.balance === 'number' ? a.balance : 0,
+    category: a.category || a.type || 'other',
+    note: typeof a.note === 'string' ? a.note : ''
+  }));
+
+  data.version = 5;
+  return data;
+}
+
+function getDefaultData() {
+  return {
+    debts: DEFAULT_DEBTS,
+    settings: DEFAULT_SETTINGS,
+    customStages: STAGES,
+    transactions: [],
+    assets: [],
+    version: 5
+  };
 }
 
 function saveData(data) {

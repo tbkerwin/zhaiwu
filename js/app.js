@@ -7,12 +7,37 @@ let currentEditingDebtId = null;
 let calendarDate = new Date();
 
 // ============================================
+// 全局错误提示（出错时在页面顶部显示，便于定位）
+// ============================================
+
+function showErrorBanner(message) {
+  const el = document.getElementById('errorBanner');
+  if (!el) return;
+  el.style.display = 'block';
+  el.textContent = '出错了：' + message;
+}
+
+window.addEventListener('error', e => {
+  showErrorBanner((e.message || '未知错误') + (e.lineno ? `（第 ${e.lineno} 行）` : ''));
+});
+
+window.addEventListener('unhandledrejection', e => {
+  const r = e.reason;
+  showErrorBanner((r && (r.message || r)) || '未知异步错误');
+});
+
+// ============================================
 // 初始化
 // ============================================
 
 document.addEventListener('DOMContentLoaded', () => {
   registerServiceWorker();
-  bindEvents();
+  try {
+    bindEvents();
+  } catch (e) {
+    console.error('事件绑定失败：', e);
+    showErrorBanner('事件绑定失败：' + (e.message || e));
+  }
   renderAll();
 });
 
@@ -25,49 +50,59 @@ function registerServiceWorker() {
 }
 
 function bindEvents() {
-  // 底部 Tab 切换
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  // 元素不存在时跳过，避免单个缺失导致后续绑定全部失效
+  const on = (id, event, handler) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(event, handler);
+    else console.warn('未找到元素：#' + id);
+  };
+
+  // 底部 Tab 切换（事件委托，即使按钮动态变化也能响应）
+  const tabBar = document.querySelector('.tab-bar') || document.body;
+  tabBar.addEventListener('click', e => {
+    const btn = e.target.closest('.tab-btn');
+    if (btn && btn.dataset.tab) switchTab(btn.dataset.tab);
   });
 
   // 添加债务
-  document.getElementById('addDebtBtn').addEventListener('click', () => openDebtModal());
+  on('addDebtBtn', 'click', () => openDebtModal());
 
   // 债务模态框
-  document.getElementById('debtModalClose').addEventListener('click', closeDebtModal);
-  document.getElementById('debtModalSave').addEventListener('click', saveDebtFromModal);
-  document.getElementById('deleteDebtBtn').addEventListener('click', deleteCurrentDebt);
+  on('debtModalClose', 'click', closeDebtModal);
+  on('debtModalSave', 'click', saveDebtFromModal);
+  on('deleteDebtBtn', 'click', deleteCurrentDebt);
 
   // 提前还款模态框
-  document.getElementById('prepayModalClose').addEventListener('click', closePrepayModal);
-  document.getElementById('prepayModalSave').addEventListener('click', confirmPrepayment);
+  on('prepayModalClose', 'click', closePrepayModal);
+  on('prepayModalSave', 'click', confirmPrepayment);
 
   // 设置
-  document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+  on('saveSettingsBtn', 'click', saveSettings);
 
   // 数据管理
-  document.getElementById('exportBtn').addEventListener('click', exportData);
-  document.getElementById('importBtn').addEventListener('click', () => {
-    document.getElementById('importFile').click();
+  on('exportBtn', 'click', exportData);
+  on('importBtn', 'click', () => {
+    const f = document.getElementById('importFile');
+    if (f) f.click();
   });
-  document.getElementById('importFile').addEventListener('change', handleImport);
-  document.getElementById('resetBtn').addEventListener('click', handleReset);
+  on('importFile', 'change', handleImport);
+  on('resetBtn', 'click', handleReset);
 
   // 设置按钮 - 跳到我的 tab
-  document.getElementById('settingsBtn').addEventListener('click', () => switchTab('profile'));
+  on('settingsBtn', 'click', () => switchTab('profile'));
 
   // 记账
-  document.getElementById('quickExpenseBtn').addEventListener('click', () => openTxModal('expense'));
-  document.getElementById('quickIncomeBtn').addEventListener('click', () => openTxModal('income'));
-  document.getElementById('txModalClose').addEventListener('click', closeTxModal);
-  document.getElementById('txModalSave').addEventListener('click', saveTxFromModal);
-  document.getElementById('txDeleteBtn').addEventListener('click', deleteCurrentTx);
+  on('quickExpenseBtn', 'click', () => openTxModal('expense'));
+  on('quickIncomeBtn', 'click', () => openTxModal('income'));
+  on('txModalClose', 'click', closeTxModal);
+  on('txModalSave', 'click', saveTxFromModal);
+  on('txDeleteBtn', 'click', deleteCurrentTx);
 
   // 资产编辑
-  document.getElementById('addAssetBtn').addEventListener('click', () => openAssetModal());
-  document.getElementById('assetModalClose').addEventListener('click', closeAssetModal);
-  document.getElementById('assetModalSave').addEventListener('click', saveAssetFromModal);
-  document.getElementById('assetDeleteBtn').addEventListener('click', deleteCurrentAsset);
+  on('addAssetBtn', 'click', () => openAssetModal());
+  on('assetModalClose', 'click', closeAssetModal);
+  on('assetModalSave', 'click', saveAssetFromModal);
+  on('assetDeleteBtn', 'click', deleteCurrentAsset);
 }
 
 // ============================================
@@ -266,8 +301,11 @@ function renderMonthSummary() {
 
 function renderDebtList() {
   const list = document.getElementById('debtList');
+  if (!list) return;
 
-  if (appData.debts.length === 0) {
+  const debts = Array.isArray(appData.debts) ? appData.debts : [];
+
+  if (debts.length === 0) {
     list.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">📝</div>
@@ -278,7 +316,7 @@ function renderDebtList() {
   }
 
   // 按剩余本金排序（小额优先）
-  const sorted = [...appData.debts].sort((a, b) => a.principal - b.principal);
+  const sorted = debts.slice().sort((a, b) => (a.principal || 0) - (b.principal || 0));
 
   list.innerHTML = sorted.map(debt => {
     const paidPercent = debt.originalPrincipal > 0
@@ -752,7 +790,10 @@ function renderCalendar() {
     monthsLeft: d.remainingPeriods
   }));
 
-  const disposable = appData.settings.monthlyIncome - appData.settings.monthlyExpense;
+  // 每月可支配 = 工资 + 滴滴收入 - 生活费
+  const disposable = (appData.settings.monthlyIncome || 0)
+    + (appData.settings.didiIncome || 0)
+    - (appData.settings.monthlyExpense || 0);
   const monthlyPlan = [];
   const cursor = new Date(startDate);
 
