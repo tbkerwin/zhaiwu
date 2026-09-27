@@ -4,10 +4,11 @@
 
 const STORAGE_KEY = 'zhaiwu_data_v1';
 
-// 默认初始数据（基于个人负债消除计划书 - 修订版）
+// 默认初始数据（基于个人负债消除计划书 - 修订版 v2）
 // 修订原则：10000 元备用金尽量保留，仅启动月被动用；
 // 不再做原计划中"10 月批量提前结清 4 笔小额债务"的激进操作；
-// 月生活费节流至 1300 元以保证覆盖前 11 个月的刚性月供缺口。
+// 月生活费节流至 1300 元；
+// 每月新增滴滴收入 400 元（每周跑 1 天，每天净收入 100 元，压力可控）。
 const DEFAULT_DEBTS = [
   {
     id: 'd1',
@@ -110,6 +111,7 @@ const DEFAULT_DEBTS = [
 const DEFAULT_SETTINGS = {
   monthlyIncome: 4400,
   monthlyExpense: 1300,
+  didiIncome: 400, // 滴滴月目标收入（每周 1 天，每天净 100 元）
   initialSavings: 10000,
   emergencyReserve: 2500, // 应急储备底线（原则上不动用）
   startDate: '2026-10-01',
@@ -159,7 +161,7 @@ function loadData() {
         debts: DEFAULT_DEBTS,
         settings: DEFAULT_SETTINGS,
         customStages: STAGES,
-        version: 2
+        version: 3
       };
       saveData(initial);
       return initial;
@@ -173,6 +175,14 @@ function loadData() {
         data.settings.emergencyReserve = 2500;
       }
       data.version = 2;
+      saveData(data);
+    }
+    // 数据迁移 v2 → v3：新增滴滴收入字段
+    if (data.version < 3) {
+      if (typeof data.settings.didiIncome === 'undefined') {
+        data.settings.didiIncome = 400;
+      }
+      data.version = 3;
       saveData(data);
     }
     return data;
@@ -282,7 +292,8 @@ function getCurrentStage(data) {
 }
 
 function getMonthlyDisposable(data) {
-  return data.settings.monthlyIncome - data.settings.monthlyExpense;
+  // 月可支配 = 月工资 - 月生活费 + 滴滴月收入
+  return data.settings.monthlyIncome - data.settings.monthlyExpense + (data.settings.didiIncome || 0);
 }
 
 function getAvailableCash(data) {

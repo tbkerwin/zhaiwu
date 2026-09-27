@@ -157,7 +157,7 @@ function renderMonthSummary() {
 
   container.innerHTML = `
     <div class="month-row">
-      <span class="month-label">每月收入</span>
+      <span class="month-label">每月工资</span>
       <span class="month-value">${formatMoney(appData.settings.monthlyIncome)}</span>
     </div>
     <div class="month-row">
@@ -165,7 +165,11 @@ function renderMonthSummary() {
       <span class="month-value">${formatMoney(appData.settings.monthlyExpense)}</span>
     </div>
     <div class="month-row">
-      <span class="month-label">每月可支配</span>
+      <span class="month-label">滴滴月收入</span>
+      <span class="month-value" style="color:#34c759">+${formatMoney(appData.settings.didiIncome || 0)}</span>
+    </div>
+    <div class="month-row">
+      <span class="month-label">月可支配</span>
       <span class="month-value">${formatMoney(disposable)}</span>
     </div>
     <div class="month-row">
@@ -564,6 +568,7 @@ function renderCalendar() {
 function renderSettings() {
   document.getElementById('monthlyIncome').value = appData.settings.monthlyIncome;
   document.getElementById('monthlyExpense').value = appData.settings.monthlyExpense;
+  document.getElementById('didiIncome').value = appData.settings.didiIncome || 400;
   document.getElementById('savings').value = appData.settings.initialSavings;
   document.getElementById('emergencyReserve').value = appData.settings.emergencyReserve || 2500;
 }
@@ -571,6 +576,7 @@ function renderSettings() {
 function saveSettings() {
   appData.settings.monthlyIncome = parseFloat(document.getElementById('monthlyIncome').value) || 0;
   appData.settings.monthlyExpense = parseFloat(document.getElementById('monthlyExpense').value) || 0;
+  appData.settings.didiIncome = parseFloat(document.getElementById('didiIncome').value) || 0;
   appData.settings.initialSavings = parseFloat(document.getElementById('savings').value) || 0;
   appData.settings.emergencyReserve = parseFloat(document.getElementById('emergencyReserve').value) || 0;
   saveData(appData);
