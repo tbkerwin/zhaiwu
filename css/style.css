@@ -443,111 +443,153 @@ html, body {
   width: 100%;
 }
 
-/* ===== 日历组件 ===== */
+/* ===== 日历组件（改为月度还款计划视图） ===== */
 .calendar-container {
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+
+/* 顶部摘要 */
+.calendar-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   background: #ffffff;
   border-radius: 16px;
-  padding: 16px;
+  padding: 16px 12px;
+  margin-bottom: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-.calendar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.calendar-title {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.calendar-nav {
-  background: none;
-  border: none;
-  font-size: 18px;
-  padding: 4px 12px;
-  cursor: pointer;
-  border-radius: 8px;
-}
-
-.calendar-nav:active {
-  background: #f0f0f3;
-}
-
-.calendar-weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
+.summary-item {
   text-align: center;
-  font-size: 12px;
-  color: #8e8e93;
-  margin-bottom: 8px;
-}
-
-.calendar-days {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-}
-
-.calendar-day {
-  aspect-ratio: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  border-radius: 8px;
-  cursor: pointer;
   position: relative;
 }
 
-.calendar-day.empty {
-  visibility: hidden;
-}
-
-.calendar-day.has-payment {
-  background: #fff5f5;
-  color: #ff3b30;
-  font-weight: 600;
-}
-
-.calendar-day.has-payment::after {
+.summary-item + .summary-item::before {
   content: '';
   position: absolute;
-  bottom: 4px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #ff3b30;
+  left: 0;
+  top: 10%;
+  height: 80%;
+  width: 1px;
+  background: #e5e5e7;
 }
 
-.calendar-day.today {
-  background: #007aff;
-  color: white;
-}
-
-.calendar-day.today.has-payment::after {
-  background: white;
-}
-
-.calendar-legend {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid #f0f0f3;
-  font-size: 12px;
+.summary-label {
+  font-size: 11px;
   color: #8e8e93;
+  margin-bottom: 6px;
+}
+
+.summary-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1c1c1e;
+}
+
+/* 月份卡片列表 */
+.month-list {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.month-card {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  border-left: 3px solid #e5e5e7;
+}
+
+.month-card.current {
+  border-left-color: #007aff;
+  background: linear-gradient(90deg, #f0f8ff 0%, #ffffff 30%);
+}
+
+.month-card-header {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
+  margin-bottom: 10px;
+}
+
+.month-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1c1c1e;
+}
+
+.month-card.current .month-card-title {
+  color: #007aff;
+}
+
+.month-card-payment {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ff3b30;
+}
+
+.month-card-detail {
+  padding: 8px 0;
+  border-top: 1px solid #f0f0f3;
+  border-bottom: 1px solid #f0f0f3;
+  margin-bottom: 10px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.detail-label {
+  color: #8e8e93;
+}
+
+.detail-value {
+  color: #1c1c1e;
+  font-weight: 500;
+}
+
+.detail-value.deficit {
+  color: #ff9500;
+}
+
+.detail-value.surplus {
+  color: #34c759;
+}
+
+.detail-hint {
+  font-size: 12px;
+  padding: 4px 0 0;
+  font-weight: 500;
+}
+
+.detail-hint.deficit {
+  color: #ff9500;
+}
+
+.detail-hint.surplus {
+  color: #34c759;
+}
+
+.month-card-debts {
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
-.legend-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ff3b30;
+.debt-tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 3px 8px;
+  background: #f0f0f3;
+  color: #3a3a3c;
+  border-radius: 6px;
 }
 
 /* ===== 底部标签栏 ===== */

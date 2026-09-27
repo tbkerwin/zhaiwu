@@ -437,84 +437,119 @@ function confirmPrepayment() {
 // ============================================
 
 function renderCalendar() {
-  const year = calendarDate.getFullYear();
-  const month = calendarDate.getMonth();
-  const today = new Date();
-
-  const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
-  const weekdayNames = ['日', '一', '二', '三', '四', '五', '六'];
-
-  // 计算当月所有还款日
-  const dueDays = [...new Set(appData.debts
-    .filter(d => d.remainingPeriods > 0)
-    .map(d => d.dueDay))].sort((a, b) => a - b);
-
-  // 计算当月每日还款金额
-  const dailyPayments = {};
-  dueDays.forEach(day => {
-    const dayDebts = appData.debts.filter(d => d.remainingPeriods > 0 && d.dueDay === day);
-    dailyPayments[day] = dayDebts.reduce((sum, d) => sum + d.monthlyPayment, 0);
-  });
-
-  // 渲染
   const container = document.getElementById('calendar');
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  const startDate = new Date(appData.settings.startDate);
 
-  let daysHtml = '';
-  // 空白格
-  for (let i = 0; i < firstDay; i++) {
-    daysHtml += '<div class="calendar-day empty"></div>';
-  }
-  // 日期格
-  for (let day = 1; day <= daysInMonth; day++) {
-    const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-    const isPayment = dueDays.includes(day);
-    const cls = ['calendar-day'];
-    if (isToday) cls.push('today');
-    if (isPayment) cls.push('has-payment');
+  // 模拟每月还款推演：从 startDate 开始，按债务的 remainingPeriods 逐月递减
+  const debtStates = appData.debts.map(d => ({
+    name: d.name,
+    type: d.type,
+    monthlyPayment: d.monthlyPayment,
+    dueDay: d.dueDay,
+    monthsLeft: d.remainingPeriods
+  }));
 
-    const tooltip = isPayment ? ` title="待还 ${formatMoney(dailyPayments[day])}"` : '';
-    daysHtml += `<div class="${cls.join(' ')}"${tooltip}>${day}</div>`;
+  const disposable = appData.settings.monthlyIncome - appData.settings.monthlyExpense;
+  const monthlyPlan = [];
+  const cursor = new Date(startDate);
+
+  // 最多推演 60 个月
+  while (debtStates.some(d => d.monthsLeft > 0) && monthlyPlan.length < 60) {
+    const activeDebts = debtStates.filter(d => d.monthsLeft > 0);
+    const monthlyTotal = activeDebts.reduce((sum, d) => sum + d.monthlyPayment, 0);
+    const remaining = disposable - monthlyTotal;
+
+    monthlyPlan.push({
+      date: new Date(cursor),
+      totalPayment: monthlyTotal,
+      remaining: remaining,
+      debts: activeDebts.map(d => ({ name: d.name, amount: d.monthlyPayment, dueDay: d.dueDay })),
+      isCurrent: cursor.getFullYear() === today.getFullYear() && cursor.getMonth() === today.getMonth()
+    });
+
+    debtStates.forEach(d => { if (d.monthsLeft > 0) d.monthsLeft--; });
+    cursor.setMonth(cursor.getMonth() + 1);
   }
+
+  if (monthlyPlan.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🎉</div>
+        <div class="empty-state-text">已还清所有债务！</div>
+      </div>
+    `;
+    return;
+  }
+
+  // 顶部摘要
+  const totalMonths = monthlyPlan.length;
+  const lastDate = monthlyPlan[monthlyPlan.length - 1].date;
+  const totalRepayment = monthlyPlan.reduce((s, m) => s + m.totalPayment, 0);
+  const avgMonthly = totalRepayment / totalMonths;
+  const lastDateStr = `${lastDate.getFullYear()} 年 ${lastDate.getMonth() + 1} 月`;
+
+  // 月份列表（当前月 + 后续/历史月份）
+  const currentIdx = monthlyPlan.findIndex(m => m.isCurrent);
+  const startIdx = currentIdx >= 0 ? Math.max(0, currentIdx - 1) : 0;
+  const visibleMonths = monthlyPlan.slice(startIdx);
 
   container.innerHTML = `
-    <div class="calendar-header">
-      <button class="calendar-nav" id="prevMonth">‹</button>
-      <div class="calendar-title">${year} 年 ${monthNames[month]}</div>
-      <button class="calendar-nav" id="nextMonth">›</button>
-    </div>
-    <div class="calendar-weekdays">
-      ${weekdayNames.map(w => `<div>${w}</div>`).join('')}
-    </div>
-    <div class="calendar-days">${daysHtml}</div>
-    <div class="calendar-legend">
-      <span class="legend-dot"></span>
-      <span>还款日（点击日期查看详情）</span>
+    <div class="calendar-summary">
+      <div class="summary-item">
+        <div class="summary-label">总期数</div>
+        <div class="summary-value">${totalMonths} 个月</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">预计结清</div>
+        <div class="summary-value">${lastDateStr}</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">月均还款</div>
+        <div class="summary-value">${formatMoney(avgMonthly)}</div>
+      </div>
     </div>
 
-    ${dueDays.length > 0 ? `
-      <div style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f3">
-        <div style="font-size:13px;color:#8e8e93;margin-bottom:8px">本月还款计划</div>
-        ${dueDays.map(day => `
-          <div class="month-row">
-            <span class="month-label">${month + 1} 月 ${day} 日</span>
-            <span class="month-value">${formatMoney(dailyPayments[day])}</span>
+    <div class="month-list">
+      ${visibleMonths.map(m => {
+        const yyyy = m.date.getFullYear();
+        const mm = m.date.getMonth() + 1;
+        const isDeficit = m.remaining < 0;
+        const isSurplus = m.remaining > 0;
+        const cls = ['month-card'];
+        if (m.isCurrent) cls.push('current');
+        return `
+          <div class="${cls.join(' ')}">
+            <div class="month-card-header">
+              <div class="month-card-title">${yyyy} 年 ${mm} 月${m.isCurrent ? ' · 本月' : ''}</div>
+              <div class="month-card-payment">${formatMoney(m.totalPayment)}</div>
+            </div>
+            <div class="month-card-detail">
+              <div class="detail-row">
+                <span class="detail-label">月工资结余</span>
+                <span class="detail-value">${formatMoney(disposable)}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">还款后剩余</span>
+                <span class="detail-value ${isDeficit ? 'deficit' : isSurplus ? 'surplus' : ''}">
+                  ${formatMoney(m.remaining)}
+                </span>
+              </div>
+              ${isDeficit ? `<div class="detail-hint deficit">需动用备用金 ${formatMoney(-m.remaining)}</div>` : ''}
+              ${isSurplus ? `<div class="detail-hint surplus">盈余可累积或提前还款</div>` : ''}
+            </div>
+            <div class="month-card-debts">
+              ${m.debts.map(d => `<span class="debt-tag">${d.name} ${formatMoney(d.amount)}</span>`).join('')}
+            </div>
           </div>
-        `).join('')}
-        <button class="primary-btn full-width" id="openPrepayBtn" style="margin-top:16px">记录提前还款</button>
-      </div>
+        `;
+      }).join('')}
+    </div>
+
+    ${appData.debts.some(d => d.remainingPeriods > 0) ? `
+      <button class="primary-btn full-width" id="openPrepayBtn" style="margin-top:16px">记录提前还款</button>
     ` : ''}
   `;
-
-  document.getElementById('prevMonth').addEventListener('click', () => {
-    calendarDate.setMonth(month - 1);
-    renderCalendar();
-  });
-  document.getElementById('nextMonth').addEventListener('click', () => {
-    calendarDate.setMonth(month + 1);
-    renderCalendar();
-  });
 
   const prepayBtn = document.getElementById('openPrepayBtn');
   if (prepayBtn) {
