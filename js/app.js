@@ -938,12 +938,16 @@ function handleReset() {
 // ============================================
 
 function renderAll() {
-  renderOverview();
-  renderTransactions();
-  renderDebtList();
-  renderSettings();
-  renderProfileAssets();
-  renderCalendar();
+  // 每个渲染函数独立 try-catch，避免单个失败导致其他 tab 也空白
+  const safeRender = (name, fn) => {
+    try { fn(); } catch (e) { console.error(`[${name}] 渲染失败：`, e); }
+  };
+  safeRender('Overview', renderOverview);
+  safeRender('Transactions', renderTransactions);
+  safeRender('Debts', renderDebtList);
+  safeRender('Settings', renderSettings);
+  safeRender('ProfileAssets', renderProfileAssets);
+  safeRender('Calendar', renderCalendar);
 }
 
 // ============================================

@@ -688,6 +688,19 @@ html, body {
 .overview-card.subtle {
   background: #f8f9fb;
   box-shadow: none;
+  color: #1c1c1e;
+}
+
+.overview-card.subtle .overview-label {
+  color: #8e8e93;
+}
+
+.overview-card.subtle .overview-amount {
+  color: #1c1c1e;
+}
+
+.overview-card.subtle .overview-sub {
+  color: #8e8e93;
 }
 
 .overview-sub {
