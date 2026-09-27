@@ -451,14 +451,25 @@ function generateId() {
 // 资产模块
 // ============================================
 
-let ASSET_CATEGORY_META = null;
+let ASSET_CATEGORY_META = {
+  liquid: { name: '流动资金', icon: '💧' },
+  alipay: { name: '支付宝', icon: '💙' },
+  bank: { name: '银行卡', icon: '🏦' },
+  wechat: { name: '微信', icon: '💚' },
+  cash: { name: '现金', icon: '💵' },
+  receivable: { name: '应收款', icon: '📨' },
+  investment: { name: '投资', icon: '📈' },
+  other: { name: '其他', icon: '📦' }
+};
 
 async function loadAssetsFromJSON() {
   try {
     const res = await fetch('./assets.json');
     if (!res.ok) return null;
     const json = await res.json();
-    if (json.categoryMeta) ASSET_CATEGORY_META = json.categoryMeta;
+    if (json.categoryMeta) {
+      ASSET_CATEGORY_META = { ...ASSET_CATEGORY_META, ...json.categoryMeta };
+    }
     return json;
   } catch (e) {
     console.warn('加载 assets.json 失败：', e);
