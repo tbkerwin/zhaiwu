@@ -115,7 +115,11 @@ const DEFAULT_SETTINGS = {
   initialSavings: 10000,
   emergencyReserve: 2500, // 应急储备底线（原则上不动用）
   startDate: '2026-10-01',
-  strategy: 'conservative' // 修订版策略：能不用备用金就不用
+  strategy: 'conservative', // 修订版策略：能不用备用金就不用
+  // 按月计划收入覆盖（如某月只有部分收入，可单独指定）
+  monthlyIncomeOverrides: {
+    '2026-09': 400 // 9 月仅 28 号一笔 400 元
+  }
 };
 
 const STAGES = [
@@ -409,6 +413,24 @@ function netWorth(data) {
   return totalAssets(data) - debt;
 }
 
+function saveAsset(asset) {
+  if (!appData) return;
+  if (!appData.assets) appData.assets = [];
+  const idx = appData.assets.findIndex(a => a.id === asset.id);
+  if (idx >= 0) {
+    appData.assets[idx] = asset;
+  } else {
+    appData.assets.push(asset);
+  }
+  saveData(appData);
+}
+
+function deleteAsset(id) {
+  if (!appData) return;
+  appData.assets = (appData.assets || []).filter(a => a.id !== id);
+  saveData(appData);
+}
+
 // ============================================
 // 记账模块
 // ============================================
@@ -423,6 +445,7 @@ function getCurrentMonthBudget(data) {
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = now.getMonth();
+  const monthKey = `${yyyy}-${String(mm + 1).padStart(2, '0')}`;
   const startDate = new Date(data.settings.startDate);
   const isAfterPlanStart = now >= startDate;
 
@@ -443,12 +466,16 @@ function getCurrentMonthBudget(data) {
   // 本月计划还款（按当前月模拟计算）
   const repayment = isAfterPlanStart ? currentMonthPayment(data) : 0;
 
-  // 本月计划收入（用设置值，除非用户已经记录了工资/滴滴）
-  const plannedIncome = isAfterPlanStart
-    ? (data.settings.monthlyIncome + (data.settings.didiIncome || 0))
-    : (now.getMonth() === startDate.getMonth() - 1 && yyyy === startDate.getFullYear()
-      ? data.settings.monthlyIncome
-      : data.settings.monthlyIncome);
+  // 本月计划收入：优先用按月覆盖，否则按规则
+  let plannedIncome;
+  const overrides = data.settings.monthlyIncomeOverrides || {};
+  if (overrides[monthKey] !== undefined) {
+    plannedIncome = overrides[monthKey];
+  } else if (isAfterPlanStart) {
+    plannedIncome = data.settings.monthlyIncome + (data.settings.didiIncome || 0);
+  } else {
+    plannedIncome = data.settings.monthlyIncome;
+  }
 
   // 取"已记录收入"和"计划收入"的较大值作为可用收入基准
   const effectiveIncome = Math.max(plannedIncome, totalIncomeRecorded);
@@ -459,6 +486,7 @@ function getCurrentMonthBudget(data) {
   return {
     yyyy,
     mm,
+    monthKey,
     monthTx,
     totalExpense,
     totalIncomeRecorded,
@@ -468,6 +496,7 @@ function getCurrentMonthBudget(data) {
     repayment,
     plannedIncome,
     effectiveIncome,
-    availableCash
+    availableCash,
+    isOverride: overrides[monthKey] !== undefined
   };
 }

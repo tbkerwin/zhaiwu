@@ -167,6 +167,14 @@
       <!-- Tab: 我的 -->
       <section class="tab-content" id="tab-profile">
         <div class="section-card">
+          <div class="section-title">
+            <span>💎 我的资产</span>
+            <button class="link-btn" id="addAssetBtn">+ 添加</button>
+          </div>
+          <div class="asset-list" id="assetListProfile"></div>
+        </div>
+
+        <div class="section-card">
           <div class="section-title">每月资金</div>
           <div class="form-group">
             <label>每月工资（元）</label>
@@ -230,6 +238,36 @@
         <span class="tab-label">我的</span>
       </button>
     </nav>
+  </div>
+
+  <!-- 模态框：编辑资产 -->
+  <div class="modal" id="assetModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button class="modal-close" id="assetModalClose">取消</button>
+        <h3 id="assetModalTitle">编辑资产</h3>
+        <button class="modal-save" id="assetModalSave">保存</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>资产名称</label>
+          <input type="text" id="assetName" placeholder="如：招商银行储蓄卡">
+        </div>
+        <div class="form-group">
+          <label>余额（元）</label>
+          <input type="number" id="assetBalance" inputmode="decimal" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>分类</label>
+          <select id="assetCategory"></select>
+        </div>
+        <div class="form-group">
+          <label>备注（可选）</label>
+          <input type="text" id="assetNote">
+        </div>
+        <button class="danger-btn full-width" id="assetDeleteBtn" style="display:none">删除这笔资产</button>
+      </div>
+    </div>
   </div>
 
   <!-- 模态框：记账 -->

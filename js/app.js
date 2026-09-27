@@ -62,6 +62,12 @@ function bindEvents() {
   document.getElementById('txModalClose').addEventListener('click', closeTxModal);
   document.getElementById('txModalSave').addEventListener('click', saveTxFromModal);
   document.getElementById('txDeleteBtn').addEventListener('click', deleteCurrentTx);
+
+  // 资产编辑
+  document.getElementById('addAssetBtn').addEventListener('click', () => openAssetModal());
+  document.getElementById('assetModalClose').addEventListener('click', closeAssetModal);
+  document.getElementById('assetModalSave').addEventListener('click', saveAssetFromModal);
+  document.getElementById('assetDeleteBtn').addEventListener('click', deleteCurrentAsset);
 }
 
 // ============================================
@@ -876,6 +882,32 @@ function saveSettings() {
   showToast('设置已保存');
 }
 
+function renderProfileAssets() {
+  const listEl = document.getElementById('assetListProfile');
+  if (!listEl) return;
+  const assets = appData.assets || [];
+  if (assets.length === 0) {
+    listEl.innerHTML = '<div class="muted" style="padding:8px 0">暂无资产，点击右上角添加</div>';
+    return;
+  }
+  listEl.innerHTML = assets.map(a => {
+    const meta = getAssetCategoryMeta(a.category);
+    return `
+      <div class="asset-row" data-asset-id="${a.id}">
+        <div class="asset-icon">${meta.icon}</div>
+        <div class="asset-info">
+          <div class="asset-name">${a.name}</div>
+          <div class="asset-category">${meta.name}${a.note ? ' · ' + a.note : ''}</div>
+        </div>
+        <div class="asset-balance">${formatMoney(a.balance)}</div>
+      </div>
+    `;
+  }).join('');
+  listEl.querySelectorAll('.asset-row').forEach(el => {
+    el.addEventListener('click', () => openAssetModal(el.getAttribute('data-asset-id')));
+  });
+}
+
 // ============================================
 // 数据管理
 // ============================================
@@ -910,6 +942,7 @@ function renderAll() {
   renderTransactions();
   renderDebtList();
   renderSettings();
+  renderProfileAssets();
   renderCalendar();
 }
 
@@ -924,4 +957,93 @@ function showToast(msg) {
   toast.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// ============================================
+// 资产编辑
+// ============================================
+
+let currentAssetId = null;
+
+function openAssetModal(assetId) {
+  currentAssetId = assetId || null;
+  const modal = document.getElementById('assetModal');
+  const title = document.getElementById('assetModalTitle');
+  const nameInput = document.getElementById('assetName');
+  const balanceInput = document.getElementById('assetBalance');
+  const categorySelect = document.getElementById('assetCategory');
+  const noteInput = document.getElementById('assetNote');
+  const deleteBtn = document.getElementById('assetDeleteBtn');
+
+  // 填充分类下拉（基于 assets.json 的 categoryMeta）
+  const metas = ASSET_CATEGORY_META || { liquid: { name: '流动资金' }, bank: { name: '银行卡' }, other: { name: '其他' } };
+  categorySelect.innerHTML = Object.keys(metas).map(k =>
+    `<option value="${k}">${metas[k].icon || ''} ${metas[k].name}</option>`
+  ).join('');
+
+  if (assetId) {
+    const a = appData.assets.find(x => x.id === assetId);
+    if (!a) return;
+    title.textContent = '编辑资产';
+    nameInput.value = a.name;
+    balanceInput.value = a.balance;
+    categorySelect.value = a.category;
+    noteInput.value = a.note || '';
+    deleteBtn.style.display = 'block';
+  } else {
+    title.textContent = '添加资产';
+    nameInput.value = '';
+    balanceInput.value = '';
+    categorySelect.value = 'liquid';
+    noteInput.value = '';
+    deleteBtn.style.display = 'none';
+  }
+
+  modal.classList.add('show');
+  setTimeout(() => nameInput.focus(), 100);
+}
+
+function closeAssetModal() {
+  document.getElementById('assetModal').classList.remove('show');
+  currentAssetId = null;
+}
+
+function saveAssetFromModal() {
+  const name = document.getElementById('assetName').value.trim();
+  const balance = parseFloat(document.getElementById('assetBalance').value) || 0;
+  const category = document.getElementById('assetCategory').value;
+  const note = document.getElementById('assetNote').value.trim();
+
+  if (!name) {
+    showToast('请输入资产名称');
+    return;
+  }
+  if (balance < 0) {
+    showToast('余额不能为负');
+    return;
+  }
+
+  const asset = {
+    id: currentAssetId || ('asset-' + Date.now().toString(36)),
+    type: category,
+    name,
+    balance,
+    category,
+    note,
+    updatedAt: new Date().toISOString()
+  };
+
+  saveAsset(asset);
+  closeAssetModal();
+  renderAll();
+  showToast('已保存');
+}
+
+function deleteCurrentAsset() {
+  if (!currentAssetId) return;
+  if (!confirm('确定要删除这笔资产吗？')) return;
+  deleteAsset(currentAssetId);
+  closeAssetModal();
+  renderAll();
+  showToast('已删除');
 }
