@@ -9,8 +9,8 @@
   </header>
 
   <main class="app-main">
-    <TabOverview v-if="active === 'overview'" @go="active = $event" />
-    <TabBudget v-else-if="active === 'budget'" />
+    <TabOverview v-if="active === 'overview'" />
+    <TabPlan v-else-if="active === 'plan'" />
     <TabDebts v-else-if="active === 'debts'" />
     <TabCalendar v-else-if="active === 'calendar'" />
     <TabProfile v-else-if="active === 'profile'" />
@@ -37,16 +37,16 @@
 import { ref, onMounted, onErrorCaptured } from 'vue'
 import { toastText } from './lib/toast'
 import TabOverview from './components/TabOverview.vue'
-import TabBudget from './components/TabBudget.vue'
+import TabPlan from './components/TabPlan.vue'
 import TabDebts from './components/TabDebts.vue'
 import TabCalendar from './components/TabCalendar.vue'
 import TabProfile from './components/TabProfile.vue'
 
-const APP_VERSION = '2.0'
+const APP_VERSION = '2.1'
 
 const tabs = [
   { id: 'overview', label: '总览', icon: '📊' },
-  { id: 'budget', label: '记账', icon: '💰' },
+  { id: 'plan', label: '计划', icon: '📋' },
   { id: 'debts', label: '债务', icon: '💳' },
   { id: 'calendar', label: '日历', icon: '📅' },
   { id: 'profile', label: '我的', icon: '👤' }

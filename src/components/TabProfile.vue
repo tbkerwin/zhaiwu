@@ -1,44 +1,5 @@
 <template>
   <div class="page">
-    <!-- 资产 -->
-    <div class="card">
-      <div class="section-title">
-        <span>💎 我的资产</span>
-        <button class="btn-link" @click="openAsset()">+ 添加</button>
-      </div>
-
-      <div v-if="state.assets.length === 0" class="muted">暂无资产，点击右上角添加</div>
-
-      <div
-        v-for="a in state.assets"
-        :key="a.id"
-        class="item"
-        style="margin-bottom: 8px"
-        @click="openAsset(a)"
-      >
-        <div class="item-head">
-          <div class="item-main">
-            <div class="item-icon">{{ assetMeta(a.category).icon }}</div>
-            <div style="min-width: 0">
-              <div class="item-name">{{ a.name }}</div>
-              <div class="item-meta">
-                {{ assetMeta(a.category).name }}{{ a.note ? ' · ' + a.note : '' }}
-              </div>
-            </div>
-          </div>
-          <div class="item-value">{{ fmt(a.balance) }}</div>
-        </div>
-      </div>
-
-      <div v-if="state.assets.length > 0" class="card-row">
-        <span class="row-label">资产合计</span>
-        <span class="row-value">{{ fmt(totals.assets) }}</span>
-      </div>
-      <div class="muted" style="margin-top: 6px">
-        在「记账」中关联资产后，余额会随每笔收支自动增减
-      </div>
-    </div>
-
     <!-- 固定扣费 -->
     <div class="card">
       <div class="section-title">
@@ -125,50 +86,8 @@
       <div class="muted" style="margin-top: 4px">
         所有数据仅保存在本机浏览器，不上传任何服务器
       </div>
-      <div class="muted" style="margin-top: 4px">版本 v2.0（Vue 3 + Vite）</div>
+      <div class="muted" style="margin-top: 4px">版本 v2.1（Vue 3 + Vite）</div>
     </div>
-
-    <!-- 资产编辑 -->
-    <BaseModal
-      :open="assetOpen"
-      :title="assetEditingId ? '编辑资产' : '添加资产'"
-      @close="assetOpen = false"
-      @save="saveAssetItem"
-    >
-      <div class="field">
-        <label>资产名称</label>
-        <input v-model="assetForm.name" type="text" placeholder="例如：支付宝余额">
-      </div>
-      <div class="field">
-        <label>余额（元）</label>
-        <input v-model="assetForm.balance" type="number" inputmode="decimal" placeholder="0.00">
-      </div>
-      <div class="field">
-        <label>分类</label>
-        <div class="cat-grid">
-          <button
-            v-for="c in ASSET_CATEGORIES"
-            :key="c.id"
-            class="cat-btn"
-            :class="{ active: assetForm.category === c.id }"
-            @click="assetForm.category = c.id"
-          >
-            <span class="cat-icon">{{ c.icon }}</span>
-            {{ c.name }}
-          </button>
-        </div>
-      </div>
-      <div class="field">
-        <label>备注（可选）</label>
-        <input v-model="assetForm.note" type="text">
-      </div>
-
-      <template #footer>
-        <button v-if="assetEditingId" class="btn btn-danger" @click="removeAssetItem">
-          删除这笔资产
-        </button>
-      </template>
-    </BaseModal>
 
     <!-- 固定扣费编辑 -->
     <BaseModal
@@ -204,16 +123,13 @@ import {
   importJSON,
   resetAll,
   forceUpdate,
-  saveAsset,
-  deleteAsset,
   saveFixedFee,
   deleteFixedFee
 } from '../store'
-import { formatMoney, getAssetCategoryMeta, ASSET_CATEGORIES } from '../lib/data'
+import { formatMoney } from '../lib/data'
 import { showToast } from '../lib/toast'
 
 const fmt = formatMoney
-const assetMeta = getAssetCategoryMeta
 const fileInput = ref(null)
 
 // ===== 固定扣费 =====
@@ -271,46 +187,6 @@ function saveSettingsForm() {
     startDate: form.startDate || state.settings.startDate
   })
   showToast('设置已保存')
-}
-
-// ===== 资产 =====
-const assetOpen = ref(false)
-const assetEditingId = ref(null)
-const assetForm = reactive({ name: '', balance: '', category: 'liquid', note: '' })
-
-function openAsset(asset = null) {
-  assetEditingId.value = asset ? asset.id : null
-  Object.assign(assetForm, {
-    name: asset ? asset.name : '',
-    balance: asset ? String(asset.balance) : '',
-    category: asset ? asset.category : 'liquid',
-    note: asset ? asset.note : ''
-  })
-  assetOpen.value = true
-}
-
-function saveAssetItem() {
-  if (!assetForm.name.trim()) {
-    showToast('请填写资产名称')
-    return
-  }
-  saveAsset({
-    id: assetEditingId.value || undefined,
-    name: assetForm.name.trim(),
-    balance: parseFloat(assetForm.balance) || 0,
-    category: assetForm.category,
-    note: assetForm.note.trim()
-  })
-  assetOpen.value = false
-  showToast('已保存')
-}
-
-function removeAssetItem() {
-  if (!assetEditingId.value) return
-  if (!confirm('确定删除这笔资产吗？')) return
-  deleteAsset(assetEditingId.value)
-  assetOpen.value = false
-  showToast('已删除')
 }
 
 // ===== 数据管理 =====

@@ -12,8 +12,6 @@ import {
   totalOriginal,
   totalPaid,
   totalRemainingPeriods,
-  totalAssets,
-  netWorth,
   monthlyDisposable,
   totalFixedFees,
   currentMonthPayment,
@@ -52,8 +50,6 @@ export const totals = computed(() => ({
   original: totalOriginal(state),
   paid: totalPaid(state),
   remainingPeriods: totalRemainingPeriods(state),
-  assets: totalAssets(state),
-  net: netWorth(state),
   paidPercent: totalOriginal(state) > 0
     ? Math.round((totalPaid(state) / totalOriginal(state)) * 100)
     : 0,
@@ -103,85 +99,6 @@ export function prepayDebt(id, amount) {
 }
 
 // ============================================
-// 记账操作（关联资产，余额联动）
-// ============================================
-
-function round2(n) {
-  return Math.round((Number(n) || 0) * 100) / 100
-}
-
-// 对某个资产余额施加增量
-function applyAssetDelta(assetId, delta) {
-  if (!assetId || !delta) return
-  const asset = state.assets.find(a => a.id === assetId)
-  if (asset) asset.balance = round2(asset.balance + delta)
-}
-
-// 撤销一条记录对资产的影响（assetDelta 缺失时按类型推算）
-function revertAssetEffect(tx) {
-  if (!tx || !tx.assetId) return
-  const delta = typeof tx.assetDelta === 'number'
-    ? tx.assetDelta
-    : (tx.type === 'income' ? tx.amount : -tx.amount)
-  applyAssetDelta(tx.assetId, -delta)
-}
-
-export function saveTransaction(tx) {
-  const list = state.transactions
-  const idx = tx.id ? list.findIndex(t => t.id === tx.id) : -1
-
-  // 编辑时先撤销原记录对资产的影响
-  if (idx >= 0) revertAssetEffect(list[idx])
-
-  const amount = Number(tx.amount) || 0
-  const assetId = tx.assetId || null
-  const assetDelta = assetId ? (tx.type === 'income' ? amount : -amount) : 0
-
-  if (idx >= 0) {
-    list[idx] = { ...list[idx], ...tx, assetId, assetDelta }
-  } else {
-    list.push({
-      note: '',
-      ...tx,
-      id: tx.id || generateId('t'),
-      date: tx.date || new Date().toISOString(),
-      assetId,
-      assetDelta
-    })
-  }
-
-  // 应用新记录对资产的影响
-  applyAssetDelta(assetId, assetDelta)
-}
-
-export function deleteTransaction(id) {
-  const tx = state.transactions.find(t => t.id === id)
-  if (tx) revertAssetEffect(tx)
-  state.transactions = state.transactions.filter(t => t.id !== id)
-}
-
-// ============================================
-// 资产操作
-// ============================================
-
-export function saveAsset(asset) {
-  const idx = state.assets.findIndex(a => a.id === asset.id)
-  if (idx >= 0) {
-    state.assets[idx] = { ...state.assets[idx], ...asset }
-  } else {
-    state.assets.push({
-      id: generateId('a'),
-      note: '',
-      ...asset
-    })
-  }
-}
-
-export function deleteAsset(id) {
-  state.assets = state.assets.filter(a => a.id !== id)
-}
-
-// ============================================
 // 固定扣费（会员等自动扣款）
 // ============================================
 
@@ -228,21 +145,6 @@ export async function importJSON(file) {
 
 export function resetAll() {
   Object.assign(state, getDefaultData())
-}
-
-// 本地资产为空时，从 assets.json 补齐默认资产（保留用户已有资产）
-export async function syncAssetsIfEmpty() {
-  if (state.assets.length > 0) return
-  try {
-    const res = await fetch(`${import.meta.env.BASE_URL}assets.json?t=${Date.now()}`)
-    if (!res.ok) return
-    const json = await res.json()
-    if (json && Array.isArray(json.assets) && json.assets.length > 0) {
-      state.assets = json.assets
-    }
-  } catch (e) {
-    console.warn('加载 assets.json 失败：', e)
-  }
 }
 
 // 清理 Service Worker 与缓存后重新加载（用于卡在旧版本的设备）

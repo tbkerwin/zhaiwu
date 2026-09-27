@@ -106,36 +106,6 @@ export const STAGES = [
   }
 ]
 
-export const EXPENSE_CATEGORIES = [
-  { id: 'food', name: '餐饮', icon: '🍚' },
-  { id: 'transport', name: '交通', icon: '🚇' },
-  { id: 'shopping', name: '购物', icon: '🛍️' },
-  { id: 'bill', name: '生活缴费', icon: '💡' },
-  { id: 'medical', name: '医疗', icon: '💊' },
-  { id: 'entertainment', name: '娱乐', icon: '🎬' },
-  { id: 'social', name: '人情', icon: '🎁' },
-  { id: 'other_expense', name: '其他', icon: '📦' }
-]
-
-export const INCOME_CATEGORIES = [
-  { id: 'salary', name: '工资', icon: '💰' },
-  { id: 'didi', name: '滴滴', icon: '🚗' },
-  { id: 'bonus', name: '奖金', icon: '🎉' },
-  { id: 'refund', name: '退款', icon: '↩️' },
-  { id: 'other_income', name: '其他', icon: '💵' }
-]
-
-export const ASSET_CATEGORIES = [
-  { id: 'liquid', name: '流动资金', icon: '💧' },
-  { id: 'alipay', name: '支付宝', icon: '💙' },
-  { id: 'bank', name: '银行卡', icon: '🏦' },
-  { id: 'wechat', name: '微信', icon: '💚' },
-  { id: 'cash', name: '现金', icon: '💵' },
-  { id: 'receivable', name: '应收款', icon: '📨' },
-  { id: 'investment', name: '投资', icon: '📈' },
-  { id: 'other', name: '其他', icon: '📦' }
-]
-
 export const DEBT_TYPES = ['车贷', '信用卡', '花呗', '网贷', '亲友借款', '其他']
 
 // ============================================
@@ -164,16 +134,6 @@ export function generateId(prefix = 'd') {
 // ============================================
 // 分类元信息
 // ============================================
-
-export function getCategoryMeta(categoryId, type) {
-  const list = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES
-  return list.find(c => c.id === categoryId) || list[list.length - 1]
-}
-
-export function getAssetCategoryMeta(categoryId) {
-  return ASSET_CATEGORIES.find(c => c.id === categoryId) ||
-    ASSET_CATEGORIES[ASSET_CATEGORIES.length - 1]
-}
 
 export function getDebtTypeIcon(type) {
   const map = {
@@ -304,14 +264,6 @@ export function totalRemainingPeriods(data) {
   return (data.debts || []).reduce((sum, d) => sum + d.remainingPeriods, 0)
 }
 
-export function totalAssets(data) {
-  return (data.assets || []).reduce((sum, a) => sum + a.balance, 0)
-}
-
-export function netWorth(data) {
-  return totalAssets(data) - totalDebt(data)
-}
-
 // 每月固定扣费合计（会员等自动扣款，计入硬性支出）
 export function totalFixedFees(settings) {
   return (settings.fixedFees || []).reduce((sum, f) => sum + (f.amount || 0), 0)
@@ -411,40 +363,34 @@ export function plannedIncomeOfMonth(settings, year, month) {
   return (settings.monthlyIncome || 0) + (settings.didiIncome || 0)
 }
 
-// 某月账目汇总
-export function monthlyBudget(data, year, month) {
-  const prefix = `${year}-${String(month).padStart(2, '0')}`
-  const list = (data.transactions || []).filter(t => (t.date || '').slice(0, 7) === prefix)
-
-  const spent = list.filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0)
-  const earned = list.filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0)
-
-  const expenseBudget = data.settings.monthlyExpense || 0
-  const fixedFees = totalFixedFees(data.settings)
-  const plannedIncome = plannedIncomeOfMonth(data.settings, year, month)
-
-  // 当月应还：按该月距起始日的月数推算（起始月按 firstMonthPayment 计）
-  // 早于计划起始月的月份不计还款
+// 某月刚性还款额：按该月距起始日的月数推算（起始月按 firstMonthPayment 计）
+// 早于计划起始月的月份不计还款
+export function repaymentOfMonth(data, year, month) {
   const start = new Date(data.settings.startDate)
+  if (isNaN(start.getTime())) return 0
+
   const elapsed = (year - start.getFullYear()) * 12 + (month - 1 - start.getMonth())
-  const plannedPayment = elapsed < 0
-    ? 0
-    : (data.debts || []).reduce((sum, d) => {
-      if (d.remainingPeriods <= elapsed) return sum
-      return sum + paymentOfMonth(d, elapsed)
-    }, 0)
+  if (elapsed < 0) return 0
+
+  return (data.debts || []).reduce((sum, d) => {
+    if (d.remainingPeriods <= elapsed) return sum
+    return sum + paymentOfMonth(d, elapsed)
+  }, 0)
+}
+
+// 某月计划状态：计划收入 / 计划还款 / 固定扣费 / 本月差额
+export function monthlyPlanStatus(data, year, month) {
+  const plannedIncome = plannedIncomeOfMonth(data.settings, year, month)
+  const plannedPayment = repaymentOfMonth(data, year, month)
+  const fixedFees = totalFixedFees(data.settings)
+  const expense = data.settings.monthlyExpense || 0
 
   return {
-    list,
-    spent,
-    earned,
-    expenseBudget,
-    fixedFees,
-    expenseLeft: expenseBudget - spent,
     plannedIncome,
     plannedPayment,
-    freeToSpend: plannedIncome - plannedPayment - spent - fixedFees
+    fixedFees,
+    expense,
+    // 本月差额 = 计划收入 − 计划还款 − 固定扣费
+    balance: plannedIncome - plannedPayment - fixedFees
   }
 }

@@ -4,12 +4,11 @@
 //   Vite 静态产物 → 缓存优先（文件名带内容哈希，内容变了文件名就变）
 //   带时间戳的请求 → 直接走网络，不缓存
 
-const CACHE = 'zhaiwu-v2'
+const CACHE = 'zhaiwu-v3'
 const CORE = [
   './',
   './index.html',
   './manifest.json',
-  './assets.json',
   './icons/icon.svg'
 ]
 
