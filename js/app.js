@@ -6,6 +6,9 @@ let appData = loadData();
 let currentEditingDebtId = null;
 let calendarDate = new Date();
 
+// 当前脚本版本，需与 version.json 保持一致
+const APP_VERSION = 13;
+
 // ============================================
 // 全局错误提示（出错时在页面顶部显示，便于定位）
 // ============================================
@@ -15,6 +18,61 @@ function showErrorBanner(message) {
   if (!el) return;
   el.style.display = 'block';
   el.textContent = '出错了：' + message;
+}
+
+// ============================================
+// 版本自检与强制更新
+// ============================================
+
+// 清理 Service Worker 与所有缓存，然后带时间戳重新加载
+// 用于把停留在旧版本的设备（尤其是 iPhone 主屏 PWA）拉回最新版
+async function forceUpdate() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch (e) {
+    console.warn('注销 Service Worker 失败：', e);
+  }
+  try {
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) {
+    console.warn('清理缓存失败：', e);
+  }
+
+  const url = new URL(location.href);
+  url.searchParams.set('t', Date.now());
+  location.replace(url.toString());
+}
+
+// 对比 version.json，不一致时自动强制更新（每次会话最多一次，避免循环刷新）
+async function checkVersion() {
+  try {
+    const res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const info = await res.json();
+    if (!info || !info.version) return;
+
+    if (info.version === APP_VERSION) {
+      // 版本一致，清除更新标记
+      sessionStorage.removeItem('zhaiwu_forced_update');
+      return;
+    }
+
+    const attempted = sessionStorage.getItem('zhaiwu_forced_update');
+    if (attempted === String(info.version)) {
+      console.warn('已尝试自动更新但仍不匹配，请手动清理缓存。');
+      return;
+    }
+    sessionStorage.setItem('zhaiwu_forced_update', String(info.version));
+    await forceUpdate();
+  } catch (e) {
+    // 离线或跨域失败时忽略
+  }
 }
 
 window.addEventListener('error', e => {
@@ -49,6 +107,13 @@ document.addEventListener('DOMContentLoaded', () => {
     showErrorBanner('事件绑定失败：' + (e.message || e));
   }
   renderAll();
+
+  // 顶部显示当前版本，便于确认加载到哪一版
+  const badge = document.getElementById('appVersion');
+  if (badge) badge.textContent = 'v' + APP_VERSION;
+
+  // 版本自检（异步，不阻塞渲染）
+  checkVersion();
 });
 
 function registerServiceWorker() {
@@ -90,6 +155,10 @@ function bindEvents() {
   on('saveSettingsBtn', 'click', saveSettings);
 
   // 数据管理
+  on('checkUpdateBtn', 'click', async () => {
+    showToast('正在检查更新…');
+    await forceUpdate();
+  });
   on('exportBtn', 'click', exportData);
   on('importBtn', 'click', () => {
     const f = document.getElementById('importFile');

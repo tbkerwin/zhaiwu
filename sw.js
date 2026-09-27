@@ -1,11 +1,11 @@
 // 负债追踪 PWA Service Worker
-const CACHE_NAME = 'zhaiwu-v12';
+const CACHE_NAME = 'zhaiwu-v13';
 const urlsToCache = [
   './',
   './index.html',
-  './css/style.css?v=12',
-  './js/app.js?v=12',
-  './js/data.js?v=12',
+  './css/style.css?v=13',
+  './js/app.js?v=13',
+  './js/data.js?v=13',
   './assets.json',
   './manifest.json',
   './icons/icon.svg'
@@ -46,6 +46,12 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
 
   if (request.method !== 'GET') return;
+
+  // 版本检查文件始终走网络，不缓存
+  if (request.url.indexOf('version.json') !== -1) {
+    event.respondWith(fetch(request));
+    return;
+  }
 
   // 页面导航请求
   if (request.mode === 'navigate') {
