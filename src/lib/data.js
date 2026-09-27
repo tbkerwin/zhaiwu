@@ -52,8 +52,8 @@ export const DEFAULT_DEBTS = [
   {
     id: 'd7', name: '花呗', type: '花呗',
     principal: 548.87, monthlyPayment: 78.41,
-    remainingPeriods: 7, dueDay: 5,
-    note: '分期 7 期',
+    remainingPeriods: 7, dueDay: 15,
+    note: '分期 7 期，每月 15 日还款',
     originalPrincipal: 548.87, paidHistory: []
   },
   {
@@ -157,7 +157,7 @@ export function getDefaultData() {
     settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
     transactions: [],
     assets: [],
-    version: 5
+    version: 6
   }
 }
 
@@ -240,7 +240,14 @@ export function normalizeData(data) {
       note: typeof a.note === 'string' ? a.note : ''
     }))
 
-  data.version = 5
+  // 一次性修正：花呗还款日为每月 15 日（早期数据默认写成了 5 日）
+  if (!data.version || data.version < 6) {
+    data.debts.forEach(d => {
+      if (d.name === '花呗' && d.dueDay === 5) d.dueDay = 15
+    })
+  }
+
+  data.version = 6
   return data
 }
 
@@ -393,4 +400,136 @@ export function monthlyPlanStatus(data, year, month) {
     // 本月差额 = 计划收入 − 计划还款 − 固定扣费
     balance: plannedIncome - plannedPayment - fixedFees
   }
+}
+
+// ============================================
+// 日级日历：收入/还款按日排布 + 资金流向
+// ============================================
+
+// 发薪日：20 号 4000，28 号余额部分；滴滴按 28 日到账（保守计入）
+export const PAYDAY_MAIN = 20
+export const PAYDAY_REST = 28
+export const SALARY_MAIN_AMOUNT = 4000
+
+export function incomeEventsOfMonth(settings, year, month) {
+  const key = `${year}-${String(month).padStart(2, '0')}`
+  const override = (settings.monthlyIncomeOverrides || {})[key]
+
+  // 有按月覆盖值的月份（如 2026-09 只有 28 号一笔 400 元）
+  if (typeof override === 'number') {
+    return override > 0
+      ? [{ day: PAYDAY_REST, label: '工资（28 号）', amount: override }]
+      : []
+  }
+
+  const base = settings.monthlyIncome || 0
+  const main = Math.min(SALARY_MAIN_AMOUNT, base)
+  const rest = Math.max(0, base - main)
+
+  const events = []
+  if (main > 0) events.push({ day: PAYDAY_MAIN, label: '工资（20 号）', amount: main })
+  if (rest > 0) events.push({ day: PAYDAY_REST, label: '工资（28 号）', amount: rest })
+
+  const didi = settings.didiIncome || 0
+  if (didi > 0) events.push({ day: PAYDAY_REST, label: '滴滴收入（月目标）', amount: didi })
+
+  return events
+}
+
+// 生成全周期日级时间线：每月包含收入/还款事件、每日余额、资金流向
+export function buildMonthTimelines(data, maxMonths = 60) {
+  const settings = data.settings
+  const start = new Date(settings.startDate)
+  if (isNaN(start.getTime())) return []
+
+  const states = (data.debts || []).map(d => ({
+    name: d.name,
+    dueDay: d.dueDay || 5,
+    monthlyPayment: d.monthlyPayment,
+    firstMonthPayment: d.firstMonthPayment,
+    monthsLeft: d.remainingPeriods
+  }))
+
+  const now = new Date()
+  const timelines = []
+  const cursor = new Date(start)
+  let carry = settings.initialSavings || 0
+
+  while (states.some(s => s.monthsLeft > 0) && timelines.length < maxMonths) {
+    const elapsed = timelines.length
+    const year = cursor.getFullYear()
+    const month = cursor.getMonth() + 1
+
+    // 收入事件
+    const incomes = incomeEventsOfMonth(settings, year, month)
+
+    // 还款事件：按还款日分组
+    const byDay = new Map()
+    states.forEach(s => {
+      if (s.monthsLeft <= 0) return
+      const day = s.dueDay
+      if (!byDay.has(day)) byDay.set(day, [])
+      byDay.get(day).push({ name: s.name, amount: paymentOfMonth(s, elapsed) })
+    })
+
+    const rawEvents = [
+      ...incomes.map(e => ({
+        day: e.day, type: 'income', label: e.label, amount: e.amount, items: []
+      })),
+      ...[...byDay.entries()].map(([day, items]) => ({
+        day,
+        type: 'payment',
+        label: items.map(i => i.name).join(' + '),
+        amount: items.reduce((sum, i) => sum + i.amount, 0),
+        items
+      }))
+    ].sort((a, b) => a.day - b.day)
+
+    // 资金池：月初结转 → 各笔已到账收入，支出按到账顺序消耗
+    const pool = [{ label: '月初结转', remaining: carry }]
+    let balance = carry
+
+    const events = rawEvents.map(ev => {
+      if (ev.type === 'income') {
+        balance += ev.amount
+        pool.push({ label: `${ev.day} 日${ev.label}`, remaining: ev.amount })
+        return { ...ev, balanceAfter: balance, sources: [] }
+      }
+
+      let need = ev.amount
+      const sources = []
+      for (const p of pool) {
+        if (need <= 0) break
+        if (p.remaining <= 0) continue
+        const use = Math.min(p.remaining, need)
+        p.remaining -= use
+        need -= use
+        sources.push({ label: p.label, amount: use })
+      }
+      balance -= ev.amount
+      return { ...ev, balanceAfter: balance, sources, shortfall: Math.max(0, need) }
+    })
+
+    const totalIncome = incomes.reduce((sum, e) => sum + e.amount, 0)
+    const totalPayment = rawEvents
+      .filter(e => e.type === 'payment')
+      .reduce((sum, e) => sum + e.amount, 0)
+
+    timelines.push({
+      year,
+      month,
+      carryIn: carry,
+      carryOut: carry + totalIncome - totalPayment,
+      totalIncome,
+      totalPayment,
+      events,
+      isCurrent: year === now.getFullYear() && month === now.getMonth() + 1
+    })
+
+    carry = carry + totalIncome - totalPayment
+    states.forEach(s => { if (s.monthsLeft > 0) s.monthsLeft -= 1 })
+    cursor.setMonth(cursor.getMonth() + 1)
+  }
+
+  return timelines
 }

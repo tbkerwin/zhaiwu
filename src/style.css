@@ -366,20 +366,65 @@ body {
   margin-top: 6px;
 }
 
-.month-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+/* ===== 日级明细 ===== */
+.month-toggle {
+  cursor: pointer;
 }
 
-.tag {
-  font-size: 11px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: #f2f2f7;
-  color: #3a3a3c;
+.month-days {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
 }
+
+.day-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px dashed #efeff4;
+}
+
+.day-row:last-child {
+  border-bottom: none;
+}
+
+.day-badge {
+  flex: none;
+  width: 42px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  padding-top: 2px;
+}
+
+.day-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.day-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.day-meta {
+  font-size: 11px;
+  color: var(--gray);
+  line-height: 1.6;
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.day-amount {
+  flex: none;
+  font-size: 14px;
+  font-weight: 600;
+  padding-top: 1px;
+}
+
+.day-amount.income { color: var(--green); }
+.day-amount.expense { color: #1c1c1e; }
 
 .summary-grid {
   display: grid;

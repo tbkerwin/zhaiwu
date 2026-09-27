@@ -16,7 +16,8 @@ import {
   totalFixedFees,
   currentMonthPayment,
   getCurrentStage,
-  buildMonthlyPlan
+  buildMonthlyPlan,
+  buildMonthTimelines
 } from './lib/data'
 
 function readStored() {
@@ -65,6 +66,9 @@ export const sortedDebts = computed(() =>
 )
 
 export const monthlyPlan = computed(() => buildMonthlyPlan(state))
+
+// 日级时间线：每月按日列出收入与还款，含每日余额与资金流向
+export const monthTimelines = computed(() => buildMonthTimelines(state))
 
 // ============================================
 // 债务操作
