@@ -7,7 +7,7 @@ let currentEditingDebtId = null;
 let calendarDate = new Date();
 
 // 当前脚本版本，需与 version.json 保持一致
-const APP_VERSION = 14;
+const APP_VERSION = 15;
 
 // 最近一次渲染失败的描述，用于在页面上直接展示
 let lastRenderError = '';
@@ -213,27 +213,55 @@ function switchTab(tabName) {
   showTabFallback(tabName);
 }
 
-// 某个 tab 内容为空时，在页面上显示诊断信息
+// 判断元素是否实际不可见（内容渲染了却看不见的情况）
+function isInvisible(el) {
+  const cs = getComputedStyle(el);
+  if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) {
+    return true;
+  }
+  const rect = el.getBoundingClientRect();
+  return rect.height < 4 || rect.width < 4;
+}
+
+// 某个 tab 内容为空或不可见时，用固定浮层显示诊断信息（不依赖 tab 自身样式）
+// 延迟一帧执行，避免刚切换完布局还没重算导致误报
 function showTabFallback(tabName) {
-  const content = document.getElementById('tab-' + tabName);
-  if (!content) return;
-  if (content.innerText.replace(/\s/g, '') !== '') return;
+  setTimeout(() => {
+    const content = document.getElementById('tab-' + tabName);
+    if (!content) return;
 
-  const d = appData || {};
-  const info = [
-    `版本 v${APP_VERSION} · 屏幕 ${window.innerWidth}×${window.innerHeight}`,
-    `债务 ${(d.debts || []).length} · 记录 ${(d.transactions || []).length} · 资产 ${(d.assets || []).length}`,
-    `阶段 ${(d.customStages || []).length} · 起始日 ${d.settings ? d.settings.startDate : '无'}`
-  ].join('<br>');
+    const hasText = content.innerText.replace(/\s/g, '') !== '';
+    const invisible = isInvisible(content);
+    const existing = document.getElementById('diagOverlay');
 
-  content.innerHTML = `
-    <div class="empty-state">
-      <div class="empty-state-icon">⚠️</div>
-      <div class="empty-state-text">此页面没有渲染出内容</div>
-      <div class="empty-state-text" style="font-size:12px;opacity:.7;margin-top:10px;line-height:1.7">${info}</div>
-      ${lastRenderError ? `<div class="empty-state-text" style="font-size:12px;color:#ff3b30;margin-top:10px">${lastRenderError}</div>` : ''}
-    </div>
-  `;
+    // 正常显示时移除诊断浮层
+    if (hasText && !invisible) {
+      if (existing) existing.remove();
+      return;
+    }
+
+    let overlay = existing;
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'diagOverlay';
+      overlay.style.cssText = 'position:fixed;left:12px;right:12px;bottom:96px;z-index:9998;' +
+        'background:#1c1c1e;color:#fff;font-size:12px;line-height:1.7;padding:12px;' +
+        'border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.3)';
+      document.body.appendChild(overlay);
+    }
+
+    const d = appData || {};
+    overlay.innerHTML = `
+      <div style="font-weight:600;margin-bottom:6px">诊断：${tabName} 页面未正常显示</div>
+      <div>版本 v${APP_VERSION} · 屏幕 ${window.innerWidth}×${window.innerHeight}</div>
+      <div>债务 ${(d.debts || []).length} · 记录 ${(d.transactions || []).length} · 资产 ${(d.assets || []).length}</div>
+      <div>内容 ${hasText ? '已渲染' : '为空'} · 可见性 ${invisible ? '不可见' : '正常'}</div>
+      ${lastRenderError ? `<div style="color:#ff453a">${lastRenderError}</div>` : ''}
+      <button id="diagClose" style="margin-top:8px;background:#3a3a3c;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px">关闭</button>
+    `;
+    const closeBtn = overlay.querySelector('#diagClose');
+    if (closeBtn) closeBtn.onclick = () => overlay.remove();
+  }, 60);
 }
 
 // ============================================

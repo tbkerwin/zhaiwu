@@ -82,12 +82,6 @@ html, body {
 
 .tab-content.active {
   display: block;
-  animation: fadeIn 0.2s ease-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ===== 总览卡片 ===== */
@@ -1095,12 +1089,6 @@ html, body {
 .modal.active,
 .modal.show {
   display: flex;
-  animation: modalFadeIn 0.2s ease-out;
-}
-
-@keyframes modalFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
 }
 
 .modal-content {
@@ -1110,12 +1098,6 @@ html, body {
   background: #ffffff;
   border-radius: 20px 20px 0 0;
   overflow-y: auto;
-  animation: slideUp 0.3s ease-out;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
 }
 
 .modal-header {
