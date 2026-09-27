@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="负债追踪">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#007aff">
+
+  <title>负债消除追踪</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 顶部状态栏占位（iOS PWA 全屏时） -->
+  <div class="status-bar-spacer"></div>
+
+  <!-- 主容器 -->
+  <div id="app">
+    <!-- 顶部标题 -->
+    <header class="app-header">
+      <h1 class="app-title">负债追踪</h1>
+      <button class="icon-btn" id="settingsBtn" aria-label="设置">⚙️</button>
+    </header>
+
+    <!-- 内容区域 -->
+    <main class="app-main">
+      <!-- Tab: 总览 -->
+      <section class="tab-content active" id="tab-overview">
+        <div class="overview-card">
+          <div class="overview-label">总负债</div>
+          <div class="overview-amount" id="totalDebt">¥0</div>
+          <div class="overview-progress">
+            <div class="progress-ring">
+              <svg viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="54" class="ring-bg"/>
+                <circle cx="60" cy="60" r="54" class="ring-fg" id="progressRing"/>
+              </svg>
+              <div class="ring-text">
+                <div class="ring-percent" id="paidPercent">0%</div>
+                <div class="ring-label">已还</div>
+              </div>
+            </div>
+          </div>
+          <div class="overview-stats">
+            <div class="stat-item">
+              <div class="stat-label">已还本金</div>
+              <div class="stat-value" id="paidAmount">¥0</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <div class="stat-label">剩余期数</div>
+              <div class="stat-value" id="remainingPeriods">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 阶段进度 -->
+        <div class="section-card">
+          <div class="section-title">还款阶段</div>
+          <div class="stage-list" id="stageList"></div>
+        </div>
+
+        <!-- 本月待还 -->
+        <div class="section-card">
+          <div class="section-title">本月待还</div>
+          <div class="month-summary" id="monthSummary"></div>
+        </div>
+      </section>
+
+      <!-- Tab: 债务 -->
+      <section class="tab-content" id="tab-debts">
+        <div class="section-header">
+          <h2>所有债务</h2>
+          <button class="primary-btn" id="addDebtBtn">+ 添加</button>
+        </div>
+        <div class="debt-list" id="debtList"></div>
+      </section>
+
+      <!-- Tab: 日历 -->
+      <section class="tab-content" id="tab-calendar">
+        <div class="section-header">
+          <h2>还款日历</h2>
+        </div>
+        <div class="calendar-container" id="calendar"></div>
+      </section>
+
+      <!-- Tab: 我的 -->
+      <section class="tab-content" id="tab-profile">
+        <div class="section-card">
+          <div class="section-title">每月资金</div>
+          <div class="form-group">
+            <label>每月工资（元）</label>
+            <input type="number" id="monthlyIncome" inputmode="decimal">
+          </div>
+          <div class="form-group">
+            <label>每月生活费（元）</label>
+            <input type="number" id="monthlyExpense" inputmode="decimal">
+          </div>
+          <div class="form-group">
+            <label>备用存款（元）</label>
+            <input type="number" id="savings" inputmode="decimal">
+          </div>
+          <button class="primary-btn full-width" id="saveSettingsBtn">保存设置</button>
+        </div>
+
+        <div class="section-card">
+          <div class="section-title">数据管理</div>
+          <button class="secondary-btn full-width" id="exportBtn">导出数据</button>
+          <button class="secondary-btn full-width" id="importBtn">导入数据</button>
+          <button class="danger-btn full-width" id="resetBtn">重置数据</button>
+          <input type="file" id="importFile" accept=".json" style="display:none">
+        </div>
+
+        <div class="section-card">
+          <div class="section-title">关于</div>
+          <p class="about-text">个人负债消除追踪 PWA</p>
+          <p class="about-text">所有数据仅存储在本地浏览器，不上传任何服务器</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- 底部标签栏 -->
+    <nav class="tab-bar">
+      <button class="tab-btn active" data-tab="overview">
+        <span class="tab-icon">📊</span>
+        <span class="tab-label">总览</span>
+      </button>
+      <button class="tab-btn" data-tab="debts">
+        <span class="tab-icon">💳</span>
+        <span class="tab-label">债务</span>
+      </button>
+      <button class="tab-btn" data-tab="calendar">
+        <span class="tab-icon">📅</span>
+        <span class="tab-label">日历</span>
+      </button>
+      <button class="tab-btn" data-tab="profile">
+        <span class="tab-icon">👤</span>
+        <span class="tab-label">我的</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- 模态框：编辑/添加债务 -->
+  <div class="modal" id="debtModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button class="modal-close" id="debtModalClose">取消</button>
+        <h3 id="debtModalTitle">添加债务</h3>
+        <button class="modal-save" id="debtModalSave">保存</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>债务名称</label>
+          <input type="text" id="debtName" placeholder="如：车贷、信用卡1">
+        </div>
+        <div class="form-group">
+          <label>类型</label>
+          <select id="debtType">
+            <option value="车贷">车贷</option>
+            <option value="信用卡">信用卡</option>
+            <option value="花呗">花呗</option>
+            <option value="网贷">网贷</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>剩余本金（元）</label>
+          <input type="number" id="debtPrincipal" inputmode="decimal">
+        </div>
+        <div class="form-group">
+          <label>每月还款（元）</label>
+          <input type="number" id="debtMonthly" inputmode="decimal">
+        </div>
+        <div class="form-group">
+          <label>剩余期数</label>
+          <input type="number" id="debtPeriods" inputmode="numeric">
+        </div>
+        <div class="form-group">
+          <label>每月还款日</label>
+          <input type="number" id="debtDueDay" min="1" max="31" inputmode="numeric">
+        </div>
+        <div class="form-group">
+          <label>备注</label>
+          <textarea id="debtNote" rows="2"></textarea>
+        </div>
+        <button class="danger-btn full-width" id="deleteDebtBtn" style="display:none">删除此债务</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模态框：提前还款 -->
+  <div class="modal" id="prepayModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button class="modal-close" id="prepayModalClose">取消</button>
+        <h3>提前还款</h3>
+        <button class="modal-save" id="prepayModalSave">确认</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>选择债务</label>
+          <select id="prepayDebtId"></select>
+        </div>
+        <div class="form-group">
+          <label>还款金额（元）</label>
+          <input type="number" id="prepayAmount" inputmode="decimal">
+        </div>
+        <div class="form-group">
+          <label>日期</label>
+          <input type="date" id="prepayDate">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 提示框 -->
+  <div class="toast" id="toast"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
