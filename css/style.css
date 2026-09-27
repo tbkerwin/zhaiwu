@@ -1079,7 +1079,8 @@ html, body {
   z-index: 100;
 }
 
-.modal.active {
+.modal.active,
+.modal.show {
   display: flex;
   animation: modalFadeIn 0.2s ease-out;
 }
