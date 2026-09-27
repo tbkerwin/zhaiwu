@@ -1,11 +1,11 @@
 // 负债追踪 PWA Service Worker
-const CACHE_NAME = 'zhaiwu-v10';
+const CACHE_NAME = 'zhaiwu-v11';
 const urlsToCache = [
   './',
   './index.html',
-  './css/style.css?v=10',
-  './js/app.js?v=10',
-  './js/data.js?v=10',
+  './css/style.css?v=11',
+  './js/app.js?v=11',
+  './js/data.js?v=11',
   './assets.json',
   './manifest.json',
   './icons/icon.svg'

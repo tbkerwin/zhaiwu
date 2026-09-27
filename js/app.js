@@ -989,6 +989,13 @@ function handleReset() {
 // ============================================
 
 function renderAll() {
+  // 渲染前先从存储读取最新数据，避免异步写入（如 assets.json 同步）后 UI 不同步
+  try {
+    appData = loadData();
+  } catch (e) {
+    console.error('读取数据失败：', e);
+  }
+
   // 每个渲染函数独立 try-catch，避免单个失败导致其他 tab 也空白
   const safeRender = (name, fn) => {
     try { fn(); } catch (e) { console.error(`[${name}] 渲染失败：`, e); }
