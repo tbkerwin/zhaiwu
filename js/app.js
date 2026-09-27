@@ -115,6 +115,51 @@ function renderOverview() {
 
   // 本月待还
   renderMonthSummary();
+
+  // 净资产 + 资产
+  renderAssets();
+}
+
+function renderAssets() {
+  const total = totalAssets(appData);
+  const debt = totalDebt(appData);
+  const net = netWorth(appData);
+
+  const totalEl = document.getElementById('totalAssets');
+  const netEl = document.getElementById('netWorth');
+  const listEl = document.getElementById('assetList');
+  if (!totalEl) return;
+
+  totalEl.textContent = formatMoney(total);
+  netEl.textContent = formatMoney(net);
+  netEl.className = 'overview-amount ' + (net < 0 ? 'expense' : net > 0 ? 'income' : '');
+
+  const subHint = document.getElementById('netWorthHint');
+  if (subHint) {
+    subHint.textContent = net < 0
+      ? `总负债 ${formatMoney(debt)} 超出资产 ${formatMoney(Math.abs(net))}`
+      : `净资产已为正，扣除 ${formatMoney(debt)} 负债后`;
+  }
+
+  const assets = appData.assets || [];
+  if (assets.length === 0) {
+    listEl.innerHTML = '<div class="muted" style="padding:8px 0">暂无资产，可在 assets.json 添加或编辑本地数据</div>';
+    return;
+  }
+
+  listEl.innerHTML = assets.map(a => {
+    const meta = getAssetCategoryMeta(a.category);
+    return `
+      <div class="asset-row" data-asset-id="${a.id}">
+        <div class="asset-icon">${meta.icon}</div>
+        <div class="asset-info">
+          <div class="asset-name">${a.name}</div>
+          <div class="asset-category">${meta.name}${a.note ? ' · ' + a.note : ''}</div>
+        </div>
+        <div class="asset-balance">${formatMoney(a.balance)}</div>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderStages() {

@@ -90,8 +90,16 @@
       <!-- Tab: 总览 -->
       <section class="tab-content active" id="tab-overview">
         <div class="overview-card">
+          <div class="overview-label">净资产</div>
+          <div class="overview-amount" id="netWorth">¥0</div>
+          <div class="overview-sub" id="netWorthHint">—</div>
+        </div>
+
+        <div class="overview-card subtle">
           <div class="overview-label">总负债</div>
           <div class="overview-amount" id="totalDebt">¥0</div>
+          <div class="overview-sub" id="totalDebtHint">—</div>
+        </div>
           <div class="overview-progress">
             <div class="progress-ring">
               <svg viewBox="0 0 120 120">
@@ -121,6 +129,15 @@
         <div class="section-card">
           <div class="section-title">还款阶段</div>
           <div class="stage-list" id="stageList"></div>
+        </div>
+
+        <!-- 资产概览 -->
+        <div class="section-card">
+          <div class="section-title">
+            <span>💎 资产</span>
+            <span class="muted">合计 <span id="totalAssets">¥0</span></span>
+          </div>
+          <div class="asset-list" id="assetList"></div>
         </div>
 
         <!-- 本月待还 -->

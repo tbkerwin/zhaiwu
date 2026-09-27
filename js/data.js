@@ -182,9 +182,19 @@ function loadData() {
         settings: DEFAULT_SETTINGS,
         customStages: STAGES,
         transactions: [],
-        version: 4
+        assets: [],
+        version: 5
       };
       saveData(initial);
+      // 首次安装时尝试从 assets.json 同步默认资产
+      loadAssetsFromJSON().then(json => {
+        if (json && json.assets) {
+          const stored = loadData();
+          stored.assets = json.assets;
+          saveData(stored);
+          if (typeof renderAll === 'function') renderAll();
+        }
+      });
       return initial;
     }
     const data = JSON.parse(raw);
@@ -214,6 +224,22 @@ function loadData() {
       data.version = 4;
       saveData(data);
     }
+    // 数据迁移 v4 → v5：新增资产字段，并尝试从 assets.json 同步
+    if (data.version < 5) {
+      if (!Array.isArray(data.assets)) {
+        data.assets = [];
+      }
+      data.version = 5;
+      saveData(data);
+      loadAssetsFromJSON().then(json => {
+        if (json && json.assets && data.assets.length === 0) {
+          const stored = loadData();
+          stored.assets = json.assets;
+          saveData(stored);
+          if (typeof renderAll === 'function') renderAll();
+        }
+      });
+    }
     return data;
   } catch (e) {
     console.error('加载数据失败：', e);
@@ -222,7 +248,8 @@ function loadData() {
       settings: DEFAULT_SETTINGS,
       customStages: STAGES,
       transactions: [],
-      version: 4
+      assets: [],
+      version: 5
     };
   }
 }
@@ -344,6 +371,42 @@ function getAvailableCash(data) {
 // 生成唯一 ID
 function generateId() {
   return 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+}
+
+// ============================================
+// 资产模块
+// ============================================
+
+let ASSET_CATEGORY_META = null;
+
+async function loadAssetsFromJSON() {
+  try {
+    const res = await fetch('./assets.json');
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.categoryMeta) ASSET_CATEGORY_META = json.categoryMeta;
+    return json;
+  } catch (e) {
+    console.warn('加载 assets.json 失败：', e);
+    return null;
+  }
+}
+
+function getAssetCategoryMeta(categoryId) {
+  if (ASSET_CATEGORY_META && ASSET_CATEGORY_META[categoryId]) {
+    return ASSET_CATEGORY_META[categoryId];
+  }
+  return { name: '其他', icon: '📦' };
+}
+
+function totalAssets(data) {
+  return (data.assets || []).reduce((s, a) => s + a.balance, 0);
+}
+
+function netWorth(data) {
+  // 净资产 = 资产 - 负债
+  const debt = totalDebt(data);
+  return totalAssets(data) - debt;
 }
 
 // ============================================
