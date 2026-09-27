@@ -7,7 +7,10 @@ let currentEditingDebtId = null;
 let calendarDate = new Date();
 
 // 当前脚本版本，需与 version.json 保持一致
-const APP_VERSION = 13;
+const APP_VERSION = 14;
+
+// 最近一次渲染失败的描述，用于在页面上直接展示
+let lastRenderError = '';
 
 // ============================================
 // 全局错误提示（出错时在页面顶部显示，便于定位）
@@ -198,8 +201,39 @@ function switchTab(tabName) {
 
   // 切换到日历 tab 时重新渲染
   if (tabName === 'calendar') {
-    renderCalendar();
+    try {
+      renderCalendar();
+    } catch (e) {
+      lastRenderError = 'Calendar: ' + (e && e.message ? e.message : e);
+      console.error('[Calendar] 渲染失败：', e);
+    }
   }
+
+  // 内容为空时显示诊断信息，便于定位移动端问题
+  showTabFallback(tabName);
+}
+
+// 某个 tab 内容为空时，在页面上显示诊断信息
+function showTabFallback(tabName) {
+  const content = document.getElementById('tab-' + tabName);
+  if (!content) return;
+  if (content.innerText.replace(/\s/g, '') !== '') return;
+
+  const d = appData || {};
+  const info = [
+    `版本 v${APP_VERSION} · 屏幕 ${window.innerWidth}×${window.innerHeight}`,
+    `债务 ${(d.debts || []).length} · 记录 ${(d.transactions || []).length} · 资产 ${(d.assets || []).length}`,
+    `阶段 ${(d.customStages || []).length} · 起始日 ${d.settings ? d.settings.startDate : '无'}`
+  ].join('<br>');
+
+  content.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-state-icon">⚠️</div>
+      <div class="empty-state-text">此页面没有渲染出内容</div>
+      <div class="empty-state-text" style="font-size:12px;opacity:.7;margin-top:10px;line-height:1.7">${info}</div>
+      ${lastRenderError ? `<div class="empty-state-text" style="font-size:12px;color:#ff3b30;margin-top:10px">${lastRenderError}</div>` : ''}
+    </div>
+  `;
 }
 
 // ============================================
@@ -1067,7 +1101,14 @@ function renderAll() {
 
   // 每个渲染函数独立 try-catch，避免单个失败导致其他 tab 也空白
   const safeRender = (name, fn) => {
-    try { fn(); } catch (e) { console.error(`[${name}] 渲染失败：`, e); }
+    try {
+      fn();
+    } catch (e) {
+      const msg = `${name}: ${e && e.message ? e.message : e}`;
+      lastRenderError = msg;
+      console.error(`[${name}] 渲染失败：`, e);
+      showErrorBanner(msg);
+    }
   };
   safeRender('Overview', renderOverview);
   safeRender('Transactions', renderTransactions);
@@ -1075,6 +1116,12 @@ function renderAll() {
   safeRender('Settings', renderSettings);
   safeRender('ProfileAssets', renderProfileAssets);
   safeRender('Calendar', renderCalendar);
+
+  // 当前显示的 tab 若为空，显示诊断信息
+  const active = document.querySelector('.tab-content.active');
+  if (active && active.id.indexOf('tab-') === 0) {
+    showTabFallback(active.id.slice(4));
+  }
 }
 
 // ============================================
