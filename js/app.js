@@ -55,6 +55,13 @@ function bindEvents() {
 
   // 设置按钮 - 跳到我的 tab
   document.getElementById('settingsBtn').addEventListener('click', () => switchTab('profile'));
+
+  // 记账
+  document.getElementById('quickExpenseBtn').addEventListener('click', () => openTxModal('expense'));
+  document.getElementById('quickIncomeBtn').addEventListener('click', () => openTxModal('income'));
+  document.getElementById('txModalClose').addEventListener('click', closeTxModal);
+  document.getElementById('txModalSave').addEventListener('click', saveTxFromModal);
+  document.getElementById('txDeleteBtn').addEventListener('click', deleteCurrentTx);
 }
 
 // ============================================
@@ -440,6 +447,246 @@ function confirmPrepayment() {
 // 日历
 // ============================================
 
+// ============================================
+// 记账模块
+// ============================================
+
+function renderTransactions() {
+  const b = getCurrentMonthBudget(appData);
+
+  document.getElementById('budgetMonthTitle').textContent = `${b.yyyy} 年 ${b.mm + 1} 月 · 预算状态`;
+  document.getElementById('budgetMonthly').textContent = formatMoney(b.monthlyBudget);
+  document.getElementById('budgetSpent').textContent = formatMoney(b.totalExpense);
+
+  const remainingEl = document.getElementById('budgetRemaining');
+  remainingEl.textContent = formatMoney(b.remainingBudget);
+  remainingEl.className = 'budget-value ' + (b.remainingBudget > 0 ? 'income' : b.overBudget > 0 ? 'expense' : '');
+
+  const overHint = document.getElementById('budgetOverHint');
+  if (b.overBudget > 0) {
+    overHint.innerHTML = `<div class="budget-hint expense">⚠️ 已超支 ${formatMoney(b.overBudget)}，注意控制下半月</div>`;
+  } else {
+    overHint.innerHTML = '';
+  }
+
+  document.getElementById('budgetIncome').textContent = formatMoney(b.effectiveIncome);
+  document.getElementById('budgetRepayment').textContent = formatMoney(b.repayment);
+
+  const availEl = document.getElementById('budgetAvailable');
+  const availHint = document.getElementById('budgetAvailableHint');
+  availEl.textContent = formatMoney(b.availableCash);
+  availEl.className = 'budget-value ' + (b.availableCash > 0 ? 'income' : b.availableCash < 0 ? 'expense' : '');
+
+  if (b.availableCash < 0) {
+    availHint.innerHTML = `<div class="budget-hint expense">本月已无余裕，需控制后续支出或动用备用金</div>`;
+  } else if (b.availableCash === 0) {
+    availHint.innerHTML = `<div class="budget-hint subtle">收支基本持平</div>`;
+  } else {
+    availHint.innerHTML = `<div class="budget-hint income">✓ 余裕可用于储蓄或提前还款</div>`;
+  }
+
+  // 交易列表
+  const listEl = document.getElementById('txList');
+  const allTx = (appData.transactions || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+  document.getElementById('txCount').textContent = `${allTx.length} 笔`;
+
+  if (allTx.length === 0) {
+    listEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📝</div>
+        <div class="empty-state-text">还没有记录</div>
+        <div class="empty-state-sub">点击上方按钮记一笔</div>
+      </div>
+    `;
+    return;
+  }
+
+  // 按日期分组
+  const grouped = {};
+  allTx.forEach(t => {
+    const key = t.date.slice(0, 10);
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(t);
+  });
+
+  const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+  listEl.innerHTML = Object.keys(grouped).slice(0, 30).map(key => {
+    const txList = grouped[key];
+    const total = txList.reduce((s, t) => s + (t.type === 'expense' ? -t.amount : t.amount), 0);
+    let label = key;
+    if (key === todayStr) label = '今天';
+    else if (key === yesterday) label = '昨天';
+    else {
+      const d = new Date(key);
+      label = `${d.getMonth() + 1}/${d.getDate()} 周${dayNames[d.getDay()]}`;
+    }
+
+    return `
+      <div class="tx-day-group">
+        <div class="tx-day-header">
+          <span class="tx-day-label">${label}</span>
+          <span class="tx-day-total ${total < 0 ? 'expense' : total > 0 ? 'income' : ''}">${total === 0 ? '±0' : (total > 0 ? '+' : '') + formatMoney(total)}</span>
+        </div>
+        ${txList.map(t => {
+          const meta = getCategoryMeta(t.category, t.type);
+          return `
+            <div class="tx-row" data-tx-id="${t.id}">
+              <div class="tx-icon">${meta.icon}</div>
+              <div class="tx-info">
+                <div class="tx-category">${meta.name}${t.note ? ` · ${t.note}` : ''}</div>
+                <div class="tx-time">${new Date(t.date).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</div>
+              </div>
+              <div class="tx-amount ${t.type}">${t.type === 'expense' ? '−' : '+'}${formatMoney(t.amount)}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('.tx-row').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.getAttribute('data-tx-id');
+      openTxModal(null, id);
+    });
+  });
+}
+
+let currentTxId = null;
+let currentTxType = 'expense';
+
+function openTxModal(type, txId) {
+  currentTxId = txId || null;
+  currentTxType = type || 'expense';
+
+  const modal = document.getElementById('txModal');
+  const title = document.getElementById('txModalTitle');
+  const amountInput = document.getElementById('txAmount');
+  const dateInput = document.getElementById('txDate');
+  const noteInput = document.getElementById('txNote');
+  const deleteBtn = document.getElementById('txDeleteBtn');
+
+  if (txId) {
+    const tx = appData.transactions.find(t => t.id === txId);
+    if (!tx) return;
+    title.textContent = '编辑记录';
+    amountInput.value = tx.amount;
+    dateInput.value = tx.date.slice(0, 10);
+    noteInput.value = tx.note || '';
+    currentTxType = tx.type;
+    deleteBtn.style.display = 'block';
+  } else {
+    title.textContent = type === 'income' ? '记一笔收入' : '记一笔支出';
+    amountInput.value = '';
+    dateInput.value = new Date().toISOString().slice(0, 10);
+    noteInput.value = '';
+    deleteBtn.style.display = 'none';
+  }
+
+  // 切换类型按钮
+  document.querySelectorAll('#txTypeSwitch .tx-type-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === currentTxType);
+  });
+
+  // 渲染分类
+  renderTxCategoryGrid(currentTxType, txId ? appData.transactions.find(t => t.id === txId).category : null);
+
+  modal.classList.add('show');
+  setTimeout(() => amountInput.focus(), 100);
+}
+
+function renderTxCategoryGrid(type, selectedId) {
+  const list = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+  const grid = document.getElementById('txCategoryGrid');
+  grid.innerHTML = list.map(c => `
+    <button class="tx-cat-btn ${selectedId === c.id ? 'active' : ''}" data-cat-id="${c.id}">
+      <span class="tx-cat-icon">${c.icon}</span>
+      <span class="tx-cat-name">${c.name}</span>
+    </button>
+  `).join('');
+
+  grid.querySelectorAll('.tx-cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      grid.querySelectorAll('.tx-cat-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  // 类型切换
+  document.querySelectorAll('#txTypeSwitch .tx-type-btn').forEach(btn => {
+    btn.onclick = () => {
+      currentTxType = btn.dataset.type;
+      document.querySelectorAll('#txTypeSwitch .tx-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderTxCategoryGrid(currentTxType, null);
+    };
+  });
+}
+
+function closeTxModal() {
+  document.getElementById('txModal').classList.remove('show');
+  currentTxId = null;
+}
+
+function saveTxFromModal() {
+  const amount = parseFloat(document.getElementById('txAmount').value);
+  const date = document.getElementById('txDate').value;
+  const note = document.getElementById('txNote').value.trim();
+  const selectedCat = document.querySelector('#txCategoryGrid .tx-cat-btn.active');
+
+  if (!amount || amount <= 0) {
+    showToast('请输入有效金额');
+    return;
+  }
+  if (!selectedCat) {
+    showToast('请选择分类');
+    return;
+  }
+
+  const dateObj = new Date(date);
+  const fullDate = new Date(dateObj.getTime() + (dateObj.getHours() === 0 ? new Date().getHours() * 3600000 : 0)).toISOString();
+
+  if (!appData.transactions) appData.transactions = [];
+
+  if (currentTxId) {
+    const tx = appData.transactions.find(t => t.id === currentTxId);
+    if (tx) {
+      tx.amount = amount;
+      tx.type = currentTxType;
+      tx.category = selectedCat.dataset.catId;
+      tx.date = fullDate;
+      tx.note = note;
+    }
+  } else {
+    appData.transactions.push({
+      id: generateId(),
+      type: currentTxType,
+      amount,
+      category: selectedCat.dataset.catId,
+      note,
+      date: fullDate
+    });
+  }
+
+  saveData(appData);
+  closeTxModal();
+  renderAll();
+  showToast('已保存');
+}
+
+function deleteCurrentTx() {
+  if (!currentTxId) return;
+  if (!confirm('确定要删除这笔记录吗？')) return;
+  appData.transactions = (appData.transactions || []).filter(t => t.id !== currentTxId);
+  saveData(appData);
+  closeTxModal();
+  renderAll();
+  showToast('已删除');
+}
+
 function renderCalendar() {
   const container = document.getElementById('calendar');
   const today = new Date();
@@ -615,11 +862,10 @@ function handleReset() {
 
 function renderAll() {
   renderOverview();
+  renderTransactions();
   renderDebtList();
   renderSettings();
-  if (document.getElementById('tab-calendar').classList.contains('active')) {
-    renderCalendar();
-  }
+  renderCalendar();
 }
 
 // ============================================

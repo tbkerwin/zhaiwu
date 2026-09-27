@@ -149,6 +149,26 @@ const STAGES = [
   }
 ];
 
+// 记账分类
+const EXPENSE_CATEGORIES = [
+  { id: 'food', name: '餐饮', icon: '🍚' },
+  { id: 'transport', name: '交通', icon: '🚇' },
+  { id: 'shopping', name: '购物', icon: '🛍️' },
+  { id: 'bill', name: '生活缴费', icon: '💡' },
+  { id: 'medical', name: '医疗', icon: '💊' },
+  { id: 'entertainment', name: '娱乐', icon: '🎬' },
+  { id: 'social', name: '人情', icon: '🎁' },
+  { id: 'other_expense', name: '其他', icon: '📦' }
+];
+
+const INCOME_CATEGORIES = [
+  { id: 'salary', name: '工资', icon: '💰' },
+  { id: 'didi', name: '滴滴', icon: '🚗' },
+  { id: 'bonus', name: '奖金', icon: '🎉' },
+  { id: 'refund', name: '退款', icon: '↩️' },
+  { id: 'other_income', name: '其他', icon: '💵' }
+];
+
 // ============================================
 // 数据访问层
 // ============================================
@@ -161,7 +181,8 @@ function loadData() {
         debts: DEFAULT_DEBTS,
         settings: DEFAULT_SETTINGS,
         customStages: STAGES,
-        version: 3
+        transactions: [],
+        version: 4
       };
       saveData(initial);
       return initial;
@@ -185,6 +206,14 @@ function loadData() {
       data.version = 3;
       saveData(data);
     }
+    // 数据迁移 v3 → v4：新增交易记录
+    if (data.version < 4) {
+      if (!Array.isArray(data.transactions)) {
+        data.transactions = [];
+      }
+      data.version = 4;
+      saveData(data);
+    }
     return data;
   } catch (e) {
     console.error('加载数据失败：', e);
@@ -192,7 +221,8 @@ function loadData() {
       debts: DEFAULT_DEBTS,
       settings: DEFAULT_SETTINGS,
       customStages: STAGES,
-      version: 2
+      transactions: [],
+      version: 4
     };
   }
 }
@@ -276,9 +306,18 @@ function totalRemainingPeriods(data) {
 }
 
 function currentMonthPayment(data) {
-  return data.debts
-    .filter(d => d.remainingPeriods > 0)
-    .reduce((sum, d) => sum + d.monthlyPayment, 0);
+  // 模拟从 startDate 到当前月的递减，得到当前月真实应还月供
+  const start = new Date(data.settings.startDate);
+  const now = new Date();
+  const monthsElapsed = Math.max(0, (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()));
+
+  let total = 0;
+  data.debts.forEach(d => {
+    if (d.remainingPeriods > monthsElapsed) {
+      total += d.monthlyPayment;
+    }
+  });
+  return total;
 }
 
 function getCurrentStage(data) {
@@ -305,4 +344,67 @@ function getAvailableCash(data) {
 // 生成唯一 ID
 function generateId() {
   return 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+}
+
+// ============================================
+// 记账模块
+// ============================================
+
+function getCategoryMeta(categoryId, type) {
+  const list = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+  return list.find(c => c.id === categoryId) || list[list.length - 1];
+}
+
+// 计算当前自然月的预算状态
+function getCurrentMonthBudget(data) {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = now.getMonth();
+  const startDate = new Date(data.settings.startDate);
+  const isAfterPlanStart = now >= startDate;
+
+  // 当前月所有交易
+  const monthTx = (data.transactions || []).filter(t => {
+    const d = new Date(t.date);
+    return d.getFullYear() === yyyy && d.getMonth() === mm;
+  });
+
+  const totalExpense = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const totalIncomeRecorded = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+
+  // 月生活费预算
+  const monthlyBudget = data.settings.monthlyExpense || 0;
+  const remainingBudget = Math.max(0, monthlyBudget - totalExpense);
+  const overBudget = totalExpense > monthlyBudget ? totalExpense - monthlyBudget : 0;
+
+  // 本月计划还款（按当前月模拟计算）
+  const repayment = isAfterPlanStart ? currentMonthPayment(data) : 0;
+
+  // 本月计划收入（用设置值，除非用户已经记录了工资/滴滴）
+  const plannedIncome = isAfterPlanStart
+    ? (data.settings.monthlyIncome + (data.settings.didiIncome || 0))
+    : (now.getMonth() === startDate.getMonth() - 1 && yyyy === startDate.getFullYear()
+      ? data.settings.monthlyIncome
+      : data.settings.monthlyIncome);
+
+  // 取"已记录收入"和"计划收入"的较大值作为可用收入基准
+  const effectiveIncome = Math.max(plannedIncome, totalIncomeRecorded);
+
+  // 可自由支配 = 收入 - 还款预留 - 已支出
+  const availableCash = effectiveIncome - repayment - totalExpense;
+
+  return {
+    yyyy,
+    mm,
+    monthTx,
+    totalExpense,
+    totalIncomeRecorded,
+    monthlyBudget,
+    remainingBudget,
+    overBudget,
+    repayment,
+    plannedIncome,
+    effectiveIncome,
+    availableCash
+  };
 }

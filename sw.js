@@ -1,5 +1,5 @@
 // 负债追踪 PWA Service Worker
-const CACHE_NAME = 'zhaiwu-v4';
+const CACHE_NAME = 'zhaiwu-v5';
 const urlsToCache = [
   './',
   './index.html',

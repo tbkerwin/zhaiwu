@@ -30,6 +30,63 @@
 
     <!-- 内容区域 -->
     <main class="app-main">
+      <!-- Tab: 记账 -->
+      <section class="tab-content" id="tab-budget">
+        <div class="budget-status-card">
+          <div class="budget-month-title" id="budgetMonthTitle">本月预算</div>
+
+          <div class="budget-row primary">
+            <div class="budget-label">月生活费预算</div>
+            <div class="budget-value" id="budgetMonthly">¥0</div>
+          </div>
+          <div class="budget-row">
+            <div class="budget-label">↳ 本月已支出</div>
+            <div class="budget-value subtle" id="budgetSpent">¥0</div>
+          </div>
+          <div class="budget-row">
+            <div class="budget-label">↳ 剩余生活费预算</div>
+            <div class="budget-value" id="budgetRemaining">¥0</div>
+          </div>
+          <div id="budgetOverHint"></div>
+
+          <div class="budget-divider"></div>
+
+          <div class="budget-row">
+            <div class="budget-label">本月计划收入</div>
+            <div class="budget-value income" id="budgetIncome">¥0</div>
+          </div>
+          <div class="budget-row">
+            <div class="budget-label">本月计划还款</div>
+            <div class="budget-value expense" id="budgetRepayment">¥0</div>
+          </div>
+
+          <div class="budget-divider"></div>
+
+          <div class="budget-row highlight">
+            <div class="budget-label">本月可自由支配</div>
+            <div class="budget-value" id="budgetAvailable">¥0</div>
+          </div>
+          <div id="budgetAvailableHint" class="budget-hint"></div>
+        </div>
+
+        <div class="quick-add-bar">
+          <button class="quick-add-btn expense" id="quickExpenseBtn">
+            <span class="qa-icon">−</span>
+            <span>记一笔支出</span>
+          </button>
+          <button class="quick-add-btn income" id="quickIncomeBtn">
+            <span class="qa-icon">+</span>
+            <span>记一笔收入</span>
+          </button>
+        </div>
+
+        <div class="section-header">
+          <h2>最近记录</h2>
+          <span class="muted" id="txCount">0 笔</span>
+        </div>
+        <div class="tx-list" id="txList"></div>
+      </section>
+
       <!-- Tab: 总览 -->
       <section class="tab-content active" id="tab-overview">
         <div class="overview-card">
@@ -139,6 +196,10 @@
         <span class="tab-icon">📊</span>
         <span class="tab-label">总览</span>
       </button>
+      <button class="tab-btn" data-tab="budget">
+        <span class="tab-icon">💰</span>
+        <span class="tab-label">记账</span>
+      </button>
       <button class="tab-btn" data-tab="debts">
         <span class="tab-icon">💳</span>
         <span class="tab-label">债务</span>
@@ -152,6 +213,43 @@
         <span class="tab-label">我的</span>
       </button>
     </nav>
+  </div>
+
+  <!-- 模态框：记账 -->
+  <div class="modal" id="txModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button class="modal-close" id="txModalClose">取消</button>
+        <h3 id="txModalTitle">记一笔</h3>
+        <button class="modal-save" id="txModalSave">保存</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>类型</label>
+          <div class="tx-type-switch" id="txTypeSwitch">
+            <button class="tx-type-btn active expense" data-type="expense">支出</button>
+            <button class="tx-type-btn income" data-type="income">收入</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>金额（元）</label>
+          <input type="number" id="txAmount" inputmode="decimal" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>分类</label>
+          <div class="tx-category-grid" id="txCategoryGrid"></div>
+        </div>
+        <div class="form-group">
+          <label>日期</label>
+          <input type="date" id="txDate">
+        </div>
+        <div class="form-group">
+          <label>备注</label>
+          <input type="text" id="txNote" placeholder="可选">
+        </div>
+        <button class="danger-btn full-width" id="txDeleteBtn" style="display:none">删除这笔记录</button>
+      </div>
+    </div>
   </div>
 
   <!-- 模态框：编辑/添加债务 -->
