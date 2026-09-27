@@ -34,6 +34,9 @@
         <span class="row-label">资产合计</span>
         <span class="row-value">{{ fmt(totals.assets) }}</span>
       </div>
+      <div class="muted" style="margin-top: 6px">
+        在「记账」中关联资产后，余额会随每笔收支自动增减
+      </div>
     </div>
 
     <!-- 固定扣费 -->

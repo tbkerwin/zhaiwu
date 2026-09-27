@@ -103,24 +103,60 @@ export function prepayDebt(id, amount) {
 }
 
 // ============================================
-// 记账操作
+// 记账操作（关联资产，余额联动）
 // ============================================
 
+function round2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100
+}
+
+// 对某个资产余额施加增量
+function applyAssetDelta(assetId, delta) {
+  if (!assetId || !delta) return
+  const asset = state.assets.find(a => a.id === assetId)
+  if (asset) asset.balance = round2(asset.balance + delta)
+}
+
+// 撤销一条记录对资产的影响（assetDelta 缺失时按类型推算）
+function revertAssetEffect(tx) {
+  if (!tx || !tx.assetId) return
+  const delta = typeof tx.assetDelta === 'number'
+    ? tx.assetDelta
+    : (tx.type === 'income' ? tx.amount : -tx.amount)
+  applyAssetDelta(tx.assetId, -delta)
+}
+
 export function saveTransaction(tx) {
-  const idx = state.transactions.findIndex(t => t.id === tx.id)
+  const list = state.transactions
+  const idx = tx.id ? list.findIndex(t => t.id === tx.id) : -1
+
+  // 编辑时先撤销原记录对资产的影响
+  if (idx >= 0) revertAssetEffect(list[idx])
+
+  const amount = Number(tx.amount) || 0
+  const assetId = tx.assetId || null
+  const assetDelta = assetId ? (tx.type === 'income' ? amount : -amount) : 0
+
   if (idx >= 0) {
-    state.transactions[idx] = { ...state.transactions[idx], ...tx }
+    list[idx] = { ...list[idx], ...tx, assetId, assetDelta }
   } else {
-    state.transactions.push({
-      id: generateId('t'),
-      date: new Date().toISOString(),
+    list.push({
       note: '',
-      ...tx
+      ...tx,
+      id: tx.id || generateId('t'),
+      date: tx.date || new Date().toISOString(),
+      assetId,
+      assetDelta
     })
   }
+
+  // 应用新记录对资产的影响
+  applyAssetDelta(assetId, assetDelta)
 }
 
 export function deleteTransaction(id) {
+  const tx = state.transactions.find(t => t.id === id)
+  if (tx) revertAssetEffect(tx)
   state.transactions = state.transactions.filter(t => t.id !== id)
 }
 

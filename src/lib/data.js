@@ -263,7 +263,11 @@ export function normalizeData(data) {
       amount: typeof t.amount === 'number' ? t.amount : 0,
       category: t.category || (t.type === 'income' ? 'other_income' : 'other_expense'),
       note: typeof t.note === 'string' ? t.note : '',
-      date: typeof t.date === 'string' ? t.date : new Date().toISOString()
+      date: typeof t.date === 'string' ? t.date : new Date().toISOString(),
+      // 关联资产：assetId 记录资金来自/去往哪个资产，
+      // assetDelta 记录当时对资产余额的增减，便于编辑/删除时精确还原
+      assetId: typeof t.assetId === 'string' ? t.assetId : null,
+      assetDelta: typeof t.assetDelta === 'number' ? t.assetDelta : null
     }))
 
   data.assets = data.assets

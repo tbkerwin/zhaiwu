@@ -59,6 +59,18 @@
       </div>
     </div>
 
+    <!-- 资产余额（随记账自动变化） -->
+    <div v-if="assets.length > 0" class="card">
+      <div class="section-title">
+        <span>资产余额</span>
+        <span class="muted">随记账自动增减</span>
+      </div>
+      <div v-for="a in assets" :key="a.id" class="card-row">
+        <span class="row-label">{{ assetMeta(a.category).icon }} {{ a.name }}</span>
+        <span class="row-value">{{ fmt(a.balance) }}</span>
+      </div>
+    </div>
+
     <!-- 记一笔 -->
     <div class="btn-pair" style="margin-bottom: 16px">
       <button class="btn btn-primary" @click="openTx('expense')">− 记一笔支出</button>
@@ -90,7 +102,9 @@
         <div class="item-icon">{{ catMeta(t.category, t.type).icon }}</div>
         <div class="tx-info">
           <div class="tx-cat">{{ catMeta(t.category, t.type).name }}</div>
-          <div class="tx-note">{{ timeText(t.date) }}{{ t.note ? ' · ' + t.note : '' }}</div>
+          <div class="tx-note">
+            {{ timeText(t.date) }}<template v-if="assetName(t.assetId)"> · {{ assetName(t.assetId) }}</template>{{ t.note ? ' · ' + t.note : '' }}
+          </div>
         </div>
         <div class="tx-amount" :class="t.type">
           {{ t.type === 'expense' ? '−' : '+' }}{{ fmt(t.amount) }}
@@ -113,6 +127,35 @@
       <div class="field">
         <label>金额（元）</label>
         <input v-model="txAmount" type="number" inputmode="decimal" placeholder="0.00">
+      </div>
+
+      <div class="field">
+        <label>
+          资产（{{ txType === 'expense' ? '支出从该资产扣减' : '收入计入该资产' }}）
+        </label>
+        <div v-if="assets.length === 0" class="muted" style="font-size: 13px">
+          还没有资产，可先去「我的」添加
+        </div>
+        <div v-else class="cat-grid cols-2">
+          <button
+            class="cat-btn"
+            :class="{ active: !txAssetId }"
+            @click="txAssetId = ''"
+          >
+            <span class="cat-icon">🚫</span>
+            不关联
+          </button>
+          <button
+            v-for="a in assets"
+            :key="a.id"
+            class="cat-btn"
+            :class="{ active: txAssetId === a.id }"
+            @click="txAssetId = a.id"
+          >
+            <span class="cat-icon">{{ assetMeta(a.category).icon }}</span>
+            {{ a.name }} · {{ fmt(a.balance) }}
+          </button>
+        </div>
       </div>
 
       <div class="field">
@@ -150,6 +193,7 @@ import { state, saveTransaction, deleteTransaction } from '../store'
 import {
   formatMoney,
   getCategoryMeta,
+  getAssetCategoryMeta,
   monthlyBudget,
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES
@@ -158,6 +202,15 @@ import { showToast } from '../lib/toast'
 
 const fmt = formatMoney
 const catMeta = getCategoryMeta
+const assetMeta = getAssetCategoryMeta
+
+// 资产列表（记账时可选择，余额随记账变化）
+const assets = computed(() => state.assets || [])
+function assetName(id) {
+  if (!id) return ''
+  const a = assets.value.find(x => x.id === id)
+  return a ? a.name : ''
+}
 
 const now = new Date()
 const year = now.getFullYear()
@@ -215,6 +268,7 @@ const editingId = ref(null)
 const txType = ref('expense')
 const txAmount = ref('')
 const txCategory = ref('food')
+const txAssetId = ref('')
 const txNote = ref('')
 
 const categories = computed(() =>
@@ -228,6 +282,10 @@ function openTx(type, tx = null) {
   txCategory.value = tx
     ? tx.category
     : (type === 'expense' ? EXPENSE_CATEGORIES[0].id : INCOME_CATEGORIES[0].id)
+  // 新建时默认选中第一个资产；编辑时沿用原记录关联的资产
+  txAssetId.value = tx
+    ? (tx.assetId || '')
+    : (assets.value.length > 0 ? assets.value[0].id : '')
   txNote.value = tx ? tx.note : ''
   txOpen.value = true
 }
@@ -243,10 +301,8 @@ function saveTx() {
     type: txType.value,
     amount,
     category: txCategory.value,
-    note: txNote.value.trim(),
-    date: editingId.value
-      ? (state.transactions.find(t => t.id === editingId.value) || {}).date
-      : new Date().toISOString()
+    assetId: txAssetId.value || null,
+    note: txNote.value.trim()
   })
   txOpen.value = false
   showToast('已保存')
