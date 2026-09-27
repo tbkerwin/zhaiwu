@@ -191,14 +191,7 @@ function loadData() {
       };
       saveData(initial);
       // 首次安装时尝试从 assets.json 同步默认资产
-      loadAssetsFromJSON().then(json => {
-        if (json && json.assets) {
-          const stored = loadData();
-          stored.assets = json.assets;
-          saveData(stored);
-          if (typeof renderAll === 'function') renderAll();
-        }
-      });
+      syncAssetsFromJSONIfEmpty();
       return initial;
     }
     const data = JSON.parse(raw);
@@ -235,14 +228,10 @@ function loadData() {
       }
       data.version = 5;
       saveData(data);
-      loadAssetsFromJSON().then(json => {
-        if (json && json.assets && data.assets.length === 0) {
-          const stored = loadData();
-          stored.assets = json.assets;
-          saveData(stored);
-          if (typeof renderAll === 'function') renderAll();
-        }
-      });
+    }
+    // 本地资产为空时，尝试从 assets.json 补齐（self-heal，每次会话只尝试一次）
+    if ((data.assets || []).length === 0) {
+      syncAssetsFromJSONIfEmpty();
     }
     // 字段完整性修复：处理用户可能存在的字段缺失或类型错误
     return normalizeData(data);
@@ -349,6 +338,8 @@ function saveData(data) {
 
 function resetData() {
   localStorage.removeItem(STORAGE_KEY);
+  // 允许重置后重新从 assets.json 补齐默认资产
+  assetsSyncAttempted = false;
   return loadData();
 }
 
@@ -473,6 +464,40 @@ async function loadAssetsFromJSON() {
     console.warn('加载 assets.json 失败：', e);
     return null;
   }
+}
+
+// 本地资产为空时，从 assets.json 补齐默认资产，并通知 UI 刷新
+// 每次会话只尝试一次，避免重复请求
+let assetsSyncAttempted = false;
+function syncAssetsFromJSONIfEmpty() {
+  if (assetsSyncAttempted) return;
+  assetsSyncAttempted = true;
+
+  loadAssetsFromJSON().then(json => {
+    if (!json || !Array.isArray(json.assets) || json.assets.length === 0) return;
+
+    let stored = null;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      stored = raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return;
+    }
+    if (!stored) return;
+    // 本地已有资产则不覆盖（保留用户在 App 内编辑的结果）
+    if (Array.isArray(stored.assets) && stored.assets.length > 0) return;
+
+    stored.assets = json.assets;
+    stored.version = 5;
+    saveData(stored);
+
+    // 通知 UI 重新读取数据并渲染
+    try {
+      window.dispatchEvent(new CustomEvent('zhaiwu:data-updated'));
+    } catch (e) {
+      if (typeof renderAll === 'function') renderAll();
+    }
+  }).catch(() => {});
 }
 
 function getAssetCategoryMeta(categoryId) {

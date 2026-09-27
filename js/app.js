@@ -26,6 +26,16 @@ window.addEventListener('unhandledrejection', e => {
   showErrorBanner((r && (r.message || r)) || '未知异步错误');
 });
 
+// 数据层异步更新（如从 assets.json 补齐资产）后，重新读取并渲染
+window.addEventListener('zhaiwu:data-updated', () => {
+  try {
+    appData = loadData();
+    renderAll();
+  } catch (e) {
+    console.error('数据更新后渲染失败：', e);
+  }
+});
+
 // ============================================
 // 初始化
 // ============================================
